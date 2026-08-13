@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let text = NSTextField(labelWithString: """
         Mac CAD Preview \(version) is installed.
 
-        Select a STEP, IGES or STL file
+        Select a STEP, IGES, STL or 3MF file
         in Finder and press the spacebar.
 
         You can quit this app — the Quick Look
@@ -58,9 +58,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // Handing a URL to LaunchServices opens it in the default browser, which a
-    // sandboxed app is allowed to do — no network entitlement needed, since the
-    // request is not made by this process.
     @objc private func openSupportPage() {
         NSWorkspace.shared.open(AppDelegate.supportURL)
     }

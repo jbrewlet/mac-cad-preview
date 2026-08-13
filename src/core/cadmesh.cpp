@@ -1,8 +1,9 @@
 #include "cadmesh.h"
+#include "read_3mf.h"
 
 #include <STEPCAFControl_Reader.hxx>
 #include <IGESCAFControl_Reader.hxx>
-#include <StlAPI_Reader.hxx>
+#include <RWStl.hxx>
 #include <TDocStd_Document.hxx>
 #include <TDF_LabelSequence.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
@@ -25,11 +26,13 @@
 #include <TopoDS_Shape.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
 #include <NCollection_DataMap.hxx>
+#include <NCollection_Sequence.hxx>
 #include <Interface_Static.hxx>
 #include <IFSelect_ReturnStatus.hxx>
 #include <Message.hxx>
 #include <Quantity_ColorRGBA.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
 
 #include <algorithm>
@@ -168,6 +171,188 @@ bool readWithColors(const std::string &path, const std::string &ext,
     return true;
 }
 
+CADMesh *finalizeMesh(std::vector<float> &positions,
+                      std::vector<float> &normals,
+                      std::map<ColorKey, std::vector<uint32_t>> &buckets,
+                      int faceCount,
+                      double xMin, double yMin, double zMin,
+                      double xMax, double yMax, double zMax) {
+    if (buckets.empty()) return makeError("Nothing could be tessellated from this model.");
+
+    for (size_t i = 0; i + 2 < normals.size(); i += 3) {
+        const float len = std::sqrt(normals[i] * normals[i] +
+                                    normals[i + 1] * normals[i + 1] +
+                                    normals[i + 2] * normals[i + 2]);
+        if (len > 1e-12f) {
+            normals[i] /= len; normals[i + 1] /= len; normals[i + 2] /= len;
+        } else {
+            normals[i] = 0.0f; normals[i + 1] = 0.0f; normals[i + 2] = 1.0f;
+        }
+    }
+
+    std::vector<uint32_t> indices;
+    std::vector<CADMeshGroup> groups;
+    groups.reserve(buckets.size());
+    for (const auto &entry : buckets) {
+        CADMeshGroup group;
+        group.firstIndex = static_cast<uint32_t>(indices.size());
+        group.indexCount = static_cast<uint32_t>(entry.second.size());
+        unpackColor(entry.first, group.rgba);
+        groups.push_back(group);
+        indices.insert(indices.end(), entry.second.begin(), entry.second.end());
+    }
+
+    CADMesh *mesh = static_cast<CADMesh *>(std::calloc(1, sizeof(CADMesh)));
+    if (!mesh) return nullptr;
+
+    mesh->vertexCount   = static_cast<uint32_t>(positions.size() / 3);
+    mesh->triangleCount = static_cast<uint32_t>(indices.size() / 3);
+    mesh->groupCount    = static_cast<uint32_t>(groups.size());
+    mesh->positions = static_cast<float *>(std::malloc(positions.size() * sizeof(float)));
+    mesh->normals   = static_cast<float *>(std::malloc(normals.size() * sizeof(float)));
+    mesh->indices   = static_cast<uint32_t *>(std::malloc(indices.size() * sizeof(uint32_t)));
+    mesh->groups    = static_cast<CADMeshGroup *>(std::malloc(groups.size() * sizeof(CADMeshGroup)));
+    if (!mesh->positions || !mesh->normals || !mesh->indices || !mesh->groups) {
+        cadmesh_free(mesh);
+        return makeError("Out of memory building mesh.");
+    }
+    std::memcpy(mesh->positions, positions.data(), positions.size() * sizeof(float));
+    std::memcpy(mesh->normals,   normals.data(),   normals.size() * sizeof(float));
+    std::memcpy(mesh->indices,   indices.data(),   indices.size() * sizeof(uint32_t));
+    std::memcpy(mesh->groups,    groups.data(),    groups.size() * sizeof(CADMeshGroup));
+
+    mesh->bboxMin[0] = static_cast<float>(xMin);
+    mesh->bboxMin[1] = static_cast<float>(yMin);
+    mesh->bboxMin[2] = static_cast<float>(zMin);
+    mesh->bboxMax[0] = static_cast<float>(xMax);
+    mesh->bboxMax[1] = static_cast<float>(yMax);
+    mesh->bboxMax[2] = static_cast<float>(zMax);
+
+    char info[512];
+    std::snprintf(info, sizeof(info),
+                  "%.1f × %.1f × %.1f\n%d faces · %u triangles · %u colours",
+                  xMax - xMin, yMax - yMin, zMax - zMin,
+                  faceCount, mesh->triangleCount, mesh->groupCount);
+    mesh->info = dupString(info);
+
+    return mesh;
+}
+
+void appendTriangulation(const Handle(Poly_Triangulation) &tri,
+                         const gp_Trsf &trsf,
+                         bool reversed,
+                         ColorKey colorKey,
+                         std::vector<float> &positions,
+                         std::vector<float> &normals,
+                         std::map<ColorKey, std::vector<uint32_t>> &buckets) {
+    if (tri.IsNull()) return;
+
+    const uint32_t base = static_cast<uint32_t>(positions.size() / 3);
+    std::vector<uint32_t> &bucket = buckets[colorKey];
+
+    for (int i = 1; i <= tri->NbNodes(); ++i) {
+        gp_Pnt p = tri->Node(i);
+        p.Transform(trsf);
+        positions.push_back(static_cast<float>(p.X()));
+        positions.push_back(static_cast<float>(p.Y()));
+        positions.push_back(static_cast<float>(p.Z()));
+        normals.insert(normals.end(), {0.0f, 0.0f, 0.0f});
+    }
+
+    for (int i = 1; i <= tri->NbTriangles(); ++i) {
+        int a, b, c;
+        tri->Triangle(i).Get(a, b, c);
+        if (reversed) std::swap(b, c);
+
+        const uint32_t ia = base + a - 1;
+        const uint32_t ib = base + b - 1;
+        const uint32_t ic = base + c - 1;
+        bucket.push_back(ia);
+        bucket.push_back(ib);
+        bucket.push_back(ic);
+
+        const gp_Vec v0(positions[ia * 3], positions[ia * 3 + 1], positions[ia * 3 + 2]);
+        const gp_Vec v1(positions[ib * 3], positions[ib * 3 + 1], positions[ib * 3 + 2]);
+        const gp_Vec v2(positions[ic * 3], positions[ic * 3 + 1], positions[ic * 3 + 2]);
+        const gp_Vec n = (v1 - v0).Crossed(v2 - v0);
+        for (uint32_t idx : {ia, ib, ic}) {
+            normals[idx * 3]     += static_cast<float>(n.X());
+            normals[idx * 3 + 1] += static_cast<float>(n.Y());
+            normals[idx * 3 + 2] += static_cast<float>(n.Z());
+        }
+    }
+}
+
+CADMesh *loadFromTriangulations(const NCollection_Sequence<Handle(Poly_Triangulation)> &tris) {
+    std::vector<float> positions;
+    std::vector<float> normals;
+    std::map<ColorKey, std::vector<uint32_t>> buckets;
+    const ColorKey key = packColor(kDefaultColor[0], kDefaultColor[1],
+                                   kDefaultColor[2], kDefaultColor[3]);
+    gp_Trsf identity;
+    int faceCount = 0;
+
+    for (NCollection_Sequence<Handle(Poly_Triangulation)>::Iterator it(tris); it.More(); it.Next()) {
+        appendTriangulation(it.Value(), identity, false, key, positions, normals, buckets);
+        faceCount++;
+    }
+
+    if (positions.empty()) return makeError("File parsed, but contained no geometry.");
+
+    double xMin = positions[0], yMin = positions[1], zMin = positions[2];
+    double xMax = xMin, yMax = yMin, zMax = zMin;
+    for (size_t i = 0; i + 2 < positions.size(); i += 3) {
+        xMin = std::min(xMin, static_cast<double>(positions[i]));
+        yMin = std::min(yMin, static_cast<double>(positions[i + 1]));
+        zMin = std::min(zMin, static_cast<double>(positions[i + 2]));
+        xMax = std::max(xMax, static_cast<double>(positions[i]));
+        yMax = std::max(yMax, static_cast<double>(positions[i + 1]));
+        zMax = std::max(zMax, static_cast<double>(positions[i + 2]));
+    }
+
+    return finalizeMesh(positions, normals, buckets, faceCount,
+                        xMin, yMin, zMin, xMax, yMax, zMax);
+}
+
+CADMesh *loadFromRawMesh(const RawMesh &raw) {
+    std::vector<float> positions = raw.positions;
+    std::vector<float> normals(positions.size(), 0.0f);
+    std::map<ColorKey, std::vector<uint32_t>> buckets;
+    const ColorKey key = packColor(kDefaultColor[0], kDefaultColor[1],
+                                   kDefaultColor[2], kDefaultColor[3]);
+    std::vector<uint32_t> &bucket = buckets[key];
+    bucket = raw.indices;
+
+    for (size_t i = 0; i + 2 < raw.indices.size(); i += 3) {
+        const uint32_t ia = raw.indices[i];
+        const uint32_t ib = raw.indices[i + 1];
+        const uint32_t ic = raw.indices[i + 2];
+        const gp_Vec v0(positions[ia * 3], positions[ia * 3 + 1], positions[ia * 3 + 2]);
+        const gp_Vec v1(positions[ib * 3], positions[ib * 3 + 1], positions[ib * 3 + 2]);
+        const gp_Vec v2(positions[ic * 3], positions[ic * 3 + 1], positions[ic * 3 + 2]);
+        const gp_Vec n = (v1 - v0).Crossed(v2 - v0);
+        for (uint32_t idx : {ia, ib, ic}) {
+            normals[idx * 3]     += static_cast<float>(n.X());
+            normals[idx * 3 + 1] += static_cast<float>(n.Y());
+            normals[idx * 3 + 2] += static_cast<float>(n.Z());
+        }
+    }
+
+    double xMin = positions[0], yMin = positions[1], zMin = positions[2];
+    double xMax = xMin, yMax = yMin, zMax = zMin;
+    for (size_t i = 0; i + 2 < positions.size(); i += 3) {
+        xMin = std::min(xMin, static_cast<double>(positions[i]));
+        yMin = std::min(yMin, static_cast<double>(positions[i + 1]));
+        zMin = std::min(zMin, static_cast<double>(positions[i + 2]));
+        xMax = std::max(xMax, static_cast<double>(positions[i]));
+        yMax = std::max(yMax, static_cast<double>(positions[i + 1]));
+        zMax = std::max(zMax, static_cast<double>(positions[i + 2]));
+    }
+
+    return finalizeMesh(positions, normals, buckets, 1,
+                        xMin, yMin, zMin, xMax, yMax, zMax);
+}
+
 } // namespace
 
 extern "C" CADMesh *cadmesh_load(const char *path, double deflection) {
@@ -187,8 +372,20 @@ extern "C" CADMesh *cadmesh_load(const char *path, double deflection) {
     if (ext == "step" || ext == "stp" || ext == "p21" || ext == "iges" || ext == "igs") {
         if (!readWithColors(filePath, ext, shape, faceColors, error)) return makeError(error);
     } else if (ext == "stl") {
-        StlAPI_Reader reader;
-        if (!reader.Read(shape, filePath.c_str())) return makeError("Could not parse this STL file.");
+        // STL is already triangulated — read the mesh directly instead of
+        // forcing it through the B-rep tessellator, which fails on some files.
+        NCollection_Sequence<Handle(Poly_Triangulation)> tris;
+        RWStl::ReadFile(filePath.c_str(), M_PI / 2.0, tris);
+        if (tris.IsEmpty()) {
+            Handle(Poly_Triangulation) tri = RWStl::ReadFile(filePath.c_str());
+            if (tri.IsNull()) return makeError("Could not parse this STL file.");
+            tris.Append(tri);
+        }
+        return loadFromTriangulations(tris);
+    } else if (ext == "3mf") {
+        RawMesh raw;
+        if (!read3mf(filePath, raw, error)) return makeError(error);
+        return loadFromRawMesh(raw);
     } else {
         return makeError("Unsupported file type: ." + ext);
     }
@@ -281,66 +478,8 @@ extern "C" CADMesh *cadmesh_load(const char *path, double deflection) {
         }
     }
 
-    if (buckets.empty()) return makeError("Nothing could be tessellated from this model.");
-
-    for (size_t i = 0; i + 2 < normals.size(); i += 3) {
-        const float len = std::sqrt(normals[i] * normals[i] +
-                                    normals[i + 1] * normals[i + 1] +
-                                    normals[i + 2] * normals[i + 2]);
-        if (len > 1e-12f) {
-            normals[i] /= len; normals[i + 1] /= len; normals[i + 2] /= len;
-        } else {
-            normals[i] = 0.0f; normals[i + 1] = 0.0f; normals[i + 2] = 1.0f;
-        }
-    }
-
-    // Flatten the buckets into one index buffer with a group per colour.
-    std::vector<uint32_t> indices;
-    std::vector<CADMeshGroup> groups;
-    groups.reserve(buckets.size());
-    for (const auto &entry : buckets) {
-        CADMeshGroup group;
-        group.firstIndex = static_cast<uint32_t>(indices.size());
-        group.indexCount = static_cast<uint32_t>(entry.second.size());
-        unpackColor(entry.first, group.rgba);
-        groups.push_back(group);
-        indices.insert(indices.end(), entry.second.begin(), entry.second.end());
-    }
-
-    CADMesh *mesh = static_cast<CADMesh *>(std::calloc(1, sizeof(CADMesh)));
-    if (!mesh) return nullptr;
-
-    mesh->vertexCount   = static_cast<uint32_t>(positions.size() / 3);
-    mesh->triangleCount = static_cast<uint32_t>(indices.size() / 3);
-    mesh->groupCount    = static_cast<uint32_t>(groups.size());
-    mesh->positions = static_cast<float *>(std::malloc(positions.size() * sizeof(float)));
-    mesh->normals   = static_cast<float *>(std::malloc(normals.size() * sizeof(float)));
-    mesh->indices   = static_cast<uint32_t *>(std::malloc(indices.size() * sizeof(uint32_t)));
-    mesh->groups    = static_cast<CADMeshGroup *>(std::malloc(groups.size() * sizeof(CADMeshGroup)));
-    if (!mesh->positions || !mesh->normals || !mesh->indices || !mesh->groups) {
-        cadmesh_free(mesh);
-        return makeError("Out of memory building mesh.");
-    }
-    std::memcpy(mesh->positions, positions.data(), positions.size() * sizeof(float));
-    std::memcpy(mesh->normals,   normals.data(),   normals.size() * sizeof(float));
-    std::memcpy(mesh->indices,   indices.data(),   indices.size() * sizeof(uint32_t));
-    std::memcpy(mesh->groups,    groups.data(),    groups.size() * sizeof(CADMeshGroup));
-
-    mesh->bboxMin[0] = static_cast<float>(xMin);
-    mesh->bboxMin[1] = static_cast<float>(yMin);
-    mesh->bboxMin[2] = static_cast<float>(zMin);
-    mesh->bboxMax[0] = static_cast<float>(xMax);
-    mesh->bboxMax[1] = static_cast<float>(yMax);
-    mesh->bboxMax[2] = static_cast<float>(zMax);
-
-    char info[512];
-    std::snprintf(info, sizeof(info),
-                  "%.1f × %.1f × %.1f\n%d faces · %u triangles · %u colours",
-                  xMax - xMin, yMax - yMin, zMax - zMin,
-                  faceCount, mesh->triangleCount, mesh->groupCount);
-    mesh->info = dupString(info);
-
-    return mesh;
+    return finalizeMesh(positions, normals, buckets, faceCount,
+                        xMin, yMin, zMin, xMax, yMax, zMax);
 }
 
 extern "C" void cadmesh_free(CADMesh *mesh) {

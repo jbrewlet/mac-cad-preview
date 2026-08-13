@@ -17,7 +17,7 @@
 	<!-- Both version keys are overwritten by build.sh from the VERSION file at
 	     the repository root. The values here are only a fallback. -->
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.2.0</string>
 	<key>CFBundleVersion</key>
 	<string>0.1.0</string>
 	<key>LSMinimumSystemVersion</key>
@@ -30,6 +30,9 @@
 			<array>
 				<string>com.maccadpreview.step</string>
 				<string>com.maccadpreview.iges</string>
+				<string>com.maccadpreview.3mf</string>
+				<string>com.belighten.modelshow.3dfiles</string>
+				<string>public.3d-content</string>
 				<!-- STL included as a control: it uses a system UTI, so if STEP
 				     fails but this works, the problem is our UTI declaration. -->
 				<string>public.standard-tesselated-geometry-format</string>

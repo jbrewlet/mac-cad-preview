@@ -17,13 +17,33 @@
 	<!-- Both version keys are overwritten by build.sh from the VERSION file at
 	     the repository root. The values here are only a fallback. -->
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.2.0</string>
 	<key>CFBundleVersion</key>
 	<string>0.1.0</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>3mf</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>3MF Model</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.maccadpreview.3mf</string>
+			</array>
+		</dict>
+	</array>
 
 	<!-- macOS ships no UTI for STEP or IGES, so we declare them. STL, OBJ and
 	     PLY already have system UTIs and must NOT be redeclared here. -->
@@ -77,6 +97,30 @@
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.zip-archive</string>
+				<string>public.3d-content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>3mf</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+
+	<!-- Other apps (e.g. BeLighten ModelShow) claim their own 3MF UTIs; import
+	     them so Quick Look can still route .3mf files to our extension. -->
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.belighten.modelshow.3dfiles</string>
+			<key>UTTypeDescription</key>
+			<string>3D Manufacturing Format</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
 				<string>public.3d-content</string>
 			</array>
 			<key>UTTypeTagSpecification</key>

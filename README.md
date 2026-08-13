@@ -29,7 +29,7 @@ else to install.
 5. The app opens and shows its version. Quit it. That launch is all macOS needed;
    previews work whether or not the app is running.
 
-6. Select a `.step`, `.iges` or `.stl` file in the Finder and press the spacebar.
+6. Select a `.step`, `.iges`, `.stl` or `.3mf` file in the Finder and press the spacebar.
 
 ### Why macOS blocks it, and why step 4 matters
 
@@ -68,6 +68,10 @@ checkbox appears in the bottom right. Switch it off to see the whole part in a
 single neutral finish, which is often easier to read shape from. It is hidden
 for single colour models, where it would do nothing.
 
+On STEP and IGES files, a **Fusion** button appears top-right when Autodesk
+Fusion is installed. Click it to open the file in Fusion without leaving the
+preview.
+
 The first preview of a large file can take a few seconds. Every preview of that
 same file afterwards is instant, because the result is cached.
 
@@ -78,6 +82,7 @@ same file afterwards is instant, because the result is cached.
 | STEP | `.step`, `.stp`, `.p21` | yes |
 | IGES | `.iges`, `.igs` | yes |
 | STL | `.stl` | no (the format has none) |
+| 3MF | `.3mf` | no (basic mesh support) |
 
 Model colours are read from the file where the exporter wrote them. Not every
 exporter writes them, so a part with no colour data falls back to neutral grey.
@@ -154,7 +159,7 @@ behaves strangely.
 * gzip compressed STEP files are rejected rather than decompressed.
 * No Finder icon thumbnails yet. Files still show a generic icon in icon view;
   the preview only appears on spacebar.
-* No OBJ, PLY or 3MF support yet.
+* No OBJ or PLY support yet.
 * Apple Silicon only. Intel is not supported.
 
 ## Support

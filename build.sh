@@ -47,14 +47,18 @@ clang++ -std=c++17 -O2 -fPIC \
     -target "${ARCH}-apple-macos${DEPLOY}" \
     -I"$OCC/include/opencascade" -I"$ROOT/src/core" \
     -c "$ROOT/src/core/cadmesh.cpp" -o "$TMP/cadmesh.o"
+clang++ -std=c++17 -O2 -fPIC \
+    -target "${ARCH}-apple-macos${DEPLOY}" \
+    -I"$OCC/include/opencascade" -I"$ROOT/src/core" \
+    -c "$ROOT/src/core/read_3mf.cpp" -o "$TMP/read_3mf.o"
 
 say "Building probe CLI"
 clang++ -std=c++17 -O2 \
     -target "${ARCH}-apple-macos${DEPLOY}" \
     -I"$OCC/include/opencascade" -I"$ROOT/src/core" \
     -DCADPROBE_VERSION="\"$VERSION\"" \
-    "$TMP/cadmesh.o" "$ROOT/src/core/probe_main.cpp" \
-    -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -Wl,-rpath,"$OCC/lib" \
+    "$TMP/cadmesh.o" "$TMP/read_3mf.o" "$ROOT/src/core/probe_main.cpp" \
+    -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -lz -Wl,-rpath,"$OCC/lib" \
     -o "$BUILD/cadprobe"
 
 # ---------------------------------------------------------------- host app
@@ -68,6 +72,22 @@ swiftc -O \
 cp "$ROOT/src/app/Info.plist" "$APP/Contents/Info.plist"
 stamp_version "$APP/Contents/Info.plist"
 
+# ----------------------------------------------------------- xpc helper
+# Embedded in the .appex (not the host app) so the sandboxed extension
+# can reach it. Application-type XPC in the host .app is app-only.
+XPC="$APPEX/Contents/XPCServices/MacCADPreviewHelper.xpc"
+mkdir -p "$XPC/Contents/MacOS"
+say "Compiling XPC helper"
+swiftc -O \
+    -target "${ARCH}-apple-macos${DEPLOY}" \
+    -module-name MacCADPreviewHelper \
+    -framework Cocoa \
+    -o "$XPC/Contents/MacOS/MacCADPreviewHelper" \
+    "$ROOT/src/xpc/main.swift" \
+    "$ROOT/src/qlext/FusionOpener.swift" \
+    "$ROOT/src/shared/FusionXPC.swift"
+cp "$ROOT/src/xpc/Info.plist" "$XPC/Contents/Info.plist"
+
 # ----------------------------------------------------------- ql extension
 # An .appex has no main(); its entry point is NSExtensionMain from Foundation.
 say "Compiling Quick Look extension"
@@ -78,12 +98,16 @@ swiftc -O \
     -application-extension \
     -import-objc-header "$ROOT/src/core/cadmesh.h" \
     -framework Cocoa -framework Quartz -framework SceneKit \
-    "$TMP/cadmesh.o" \
-    -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -lc++ \
+    "$TMP/cadmesh.o" "$TMP/read_3mf.o" \
+    -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -lc++ -lz \
     -Xlinker -rpath -Xlinker "@loader_path/../Frameworks" \
     -Xlinker -e -Xlinker _NSExtensionMain \
     -o "$APPEX/Contents/MacOS/MacCADPreviewQL" \
-    "$ROOT/src/qlext/PreviewViewController.swift" "$ROOT/src/qlext/MeshData.swift"
+    "$ROOT/src/qlext/PreviewViewController.swift" \
+    "$ROOT/src/qlext/MeshData.swift" \
+    "$ROOT/src/qlext/FusionOpener.swift" \
+    "$ROOT/src/shared/FusionXPC.swift" \
+    "$ROOT/src/qlext/FusionOpenButton.swift"
 cp "$ROOT/src/qlext/Info.plist" "$APPEX/Contents/Info.plist"
 stamp_version "$APPEX/Contents/Info.plist"
 
@@ -157,6 +181,7 @@ for lib in "$FRAMEWORKS"/*.dylib; do
     [ -e "$lib" ] || continue
     codesign --force --sign - --timestamp=none "$lib"
 done
+codesign --force --sign - --timestamp=none "$XPC"
 codesign --force --sign - \
     --entitlements "$ROOT/src/qlext/entitlements.plist" \
     --timestamp=none "$APPEX"
@@ -165,5 +190,11 @@ codesign --force --sign - \
     --timestamp=none "$APP"
 
 codesign --verify --deep --strict "$APP"
+
+say "Registering Quick Look extension and 3MF type with Launch Services"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+"$LSREGISTER" -f "$APP" >/dev/null 2>&1 || true
+qlmanage -r >/dev/null 2>&1 || true
+qlmanage -r cache >/dev/null 2>&1 || true
 
 say "Built $APP — version $VERSION ($(du -sh "$APP" | cut -f1))"

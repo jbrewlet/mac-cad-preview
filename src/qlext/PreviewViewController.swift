@@ -19,6 +19,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     private var statusLabel: NSTextField!
     private var spinner: NSProgressIndicator!
     private var colorToggle: NSButton!
+    private var openInFusionButton: FusionOpenButton!
+
+    private var previewURL: URL?
 
     /// The neutral finish used when the colour toggle is off.
     private static let uniformColor = NSColor(srgbRed: 0.72, green: 0.74, blue: 0.78, alpha: 1)
@@ -77,7 +80,15 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         colorToggle.isHidden = true
         root.addSubview(colorToggle)
 
+        openInFusionButton = FusionOpenButton()
+        openInFusionButton.isHidden = true
+        openInFusionButton.onClick = { [weak self] in self?.openInFusion() }
+        root.addSubview(openInFusionButton, positioned: .above, relativeTo: sceneView)
+
         NSLayoutConstraint.activate([
+            openInFusionButton.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
+            openInFusionButton.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
+
             colorToggle.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
             colorToggle.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
 
@@ -110,6 +121,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         // A 56 MB STEP file takes ~19 s to parse — far past any QL timeout.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            self.previewURL = url
+            self.openInFusionButton.isHidden = !FusionOpener.isAvailable(for: url)
             self.statusLabel.stringValue = "Reading \(url.lastPathComponent)…"
             self.spinner.startAnimation(nil)
             handler(nil)
@@ -314,6 +327,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         }
 
         return (geometry, colors)
+    }
+
+    // MARK: - Open in Fusion
+
+    private func openInFusion() {
+        guard let url = previewURL else { return }
+        FusionOpener.requestOpen(url)
     }
 
     // MARK: - Colour toggle
