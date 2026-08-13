@@ -12,9 +12,9 @@ you can orbit, zoom and inspect without opening Fusion.
 
 ## Demo
 
-<video src="docs/demo.mp4" controls width="100%"></video>
+![Orbit a model in Quick Look, then open it in Fusion from the preview panel](docs/demo.gif)
 
-Orbit a model in Quick Look, then open it in Fusion from the preview panel.
+▶ [Watch full demo (MP4)](docs/demo.mp4)
 
 ## Install
 
