@@ -6,6 +6,8 @@ import Cocoa
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
 
+    private static let supportURL = URL(string: "https://buymeacoffee.com/jbrw")!
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let rect = NSRect(x: 0, y: 0, width: 520, height: 300)
         window = NSWindow(
@@ -33,16 +35,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         text.translatesAutoresizingMaskIntoConstraints = false
         text.maximumNumberOfLines = 0
 
+        let coffee = NSButton(
+            title: "Buy me a coffee ☕",
+            target: self,
+            action: #selector(openSupportPage)
+        )
+        coffee.bezelStyle = .rounded
+        coffee.translatesAutoresizingMaskIntoConstraints = false
+
         let content = window.contentView!
         content.addSubview(text)
+        content.addSubview(coffee)
         NSLayoutConstraint.activate([
             text.centerXAnchor.constraint(equalTo: content.centerXAnchor),
-            text.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            text.centerYAnchor.constraint(equalTo: content.centerYAnchor, constant: -24),
             text.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor, multiplier: 0.85),
+            coffee.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            coffee.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 28),
         ])
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // Handing a URL to LaunchServices opens it in the default browser, which a
+    // sandboxed app is allowed to do — no network entitlement needed, since the
+    // request is not made by this process.
+    @objc private func openSupportPage() {
+        NSWorkspace.shared.open(AppDelegate.supportURL)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

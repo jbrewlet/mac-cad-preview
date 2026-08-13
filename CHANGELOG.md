@@ -39,6 +39,7 @@ First release.
   needs, and ad-hoc signs the result.
 * `cadprobe`, a CLI for exercising and timing the geometry pipeline without
   Quick Look in the way.
+* A Buy Me a Coffee link, on the host app window and in the README.
 
 ### Known limitations
 

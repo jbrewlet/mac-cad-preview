@@ -211,6 +211,11 @@ Quick Look also kills extensions that take too long to respond, which a 19 secon
 parse would trip. So the panel is put on screen and reported ready immediately,
 and the geometry is filled in from a background queue when it is available.
 
+## Support
+
+This is free and always will be. If it saved you from opening Fusion just to
+look at a part, you can [buy me a coffee](https://buymeacoffee.com/jbrw).
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
