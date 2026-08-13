@@ -20,20 +20,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
 
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion")
             as? String ?? "unknown"
 
-        let text = NSTextField(labelWithString: """
-        Mac CAD Preview \(version) is installed.
+        let headline = NSTextField(labelWithString: "Mac CAD Preview is installed.")
+        headline.alignment = .center
+        headline.font = NSFont.systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+        headline.translatesAutoresizingMaskIntoConstraints = false
 
+        let versionLine = NSTextField(labelWithString: "Version \(version)")
+        versionLine.alignment = .center
+        versionLine.font = NSFont.monospacedSystemFont(
+            ofSize: NSFont.smallSystemFontSize,
+            weight: .regular
+        )
+        versionLine.textColor = .secondaryLabelColor
+        versionLine.translatesAutoresizingMaskIntoConstraints = false
+
+        let body = NSTextField(labelWithString: """
         Select a STEP, IGES, STL or 3MF file
         in Finder and press the spacebar.
 
         You can quit this app — the Quick Look
         extension keeps working without it.
         """)
-        text.alignment = .center
-        text.translatesAutoresizingMaskIntoConstraints = false
-        text.maximumNumberOfLines = 0
+        body.alignment = .center
+        body.translatesAutoresizingMaskIntoConstraints = false
+        body.maximumNumberOfLines = 0
 
         let coffee = NSButton(
             title: "Buy me a coffee ☕",
@@ -44,14 +57,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coffee.translatesAutoresizingMaskIntoConstraints = false
 
         let content = window.contentView!
-        content.addSubview(text)
+        content.addSubview(headline)
+        content.addSubview(versionLine)
+        content.addSubview(body)
         content.addSubview(coffee)
         NSLayoutConstraint.activate([
-            text.centerXAnchor.constraint(equalTo: content.centerXAnchor),
-            text.centerYAnchor.constraint(equalTo: content.centerYAnchor, constant: -24),
-            text.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor, multiplier: 0.85),
+            headline.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            headline.centerYAnchor.constraint(equalTo: content.centerYAnchor, constant: -72),
+            headline.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor, multiplier: 0.85),
+            versionLine.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            versionLine.topAnchor.constraint(equalTo: headline.bottomAnchor, constant: 6),
+            body.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            body.topAnchor.constraint(equalTo: versionLine.bottomAnchor, constant: 20),
+            body.widthAnchor.constraint(lessThanOrEqualTo: content.widthAnchor, multiplier: 0.85),
             coffee.centerXAnchor.constraint(equalTo: content.centerXAnchor),
-            coffee.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 28),
+            coffee.topAnchor.constraint(equalTo: body.bottomAnchor, constant: 28),
         ])
 
         window.makeKeyAndOrderFront(nil)

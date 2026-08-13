@@ -1,5 +1,7 @@
 # Mac CAD Preview
 
+![Quick Look preview of a STEP file, with the Fusion button top-right](docs/preview-step-fusion.png)
+
 Preview CAD models in the Finder by pressing the spacebar, the same way you
 already preview images and PDFs.
 
@@ -7,6 +9,12 @@ macOS has no idea what a STEP file is. Select one in the Finder, press space,
 and you get a blank document icon. This adds a Quick Look extension that reads
 the file, tessellates the real B-rep geometry, and shows an interactive 3D model
 you can orbit, zoom and inspect without opening Fusion.
+
+## Demo
+
+<video src="docs/demo.mp4" controls width="100%"></video>
+
+Orbit a model in Quick Look, then open it in Fusion from the preview panel.
 
 ## Install
 
