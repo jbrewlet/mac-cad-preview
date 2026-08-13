@@ -1,16 +1,28 @@
 // Standalone CLI so the geometry pipeline can be tested and timed without
 // going anywhere near Quick Look.
 //   ./cadprobe model.step [deflection]
+//   ./cadprobe --version
 #include "cadmesh.h"
 
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+
+// Stamped by build.sh from the VERSION file; only unset for an ad-hoc compile.
+#ifndef CADPROBE_VERSION
+#define CADPROBE_VERSION "unknown"
+#endif
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: cadprobe <file> [deflection]\n");
+        std::fprintf(stderr, "usage: cadprobe <file> [deflection]\n"
+                             "       cadprobe --version\n");
         return 2;
+    }
+    if (std::strcmp(argv[1], "--version") == 0) {
+        std::printf("cadprobe %s\n", CADPROBE_VERSION);
+        return 0;
     }
     const double deflection = (argc > 2) ? std::atof(argv[2]) : -1.0;
 

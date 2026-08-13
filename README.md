@@ -43,8 +43,12 @@ data falls back to neutral grey.
 brew install opencascade
 git clone https://github.com/jbrewlet/mac-cad-preview.git
 cd mac-cad-preview
+git checkout v0.1.0
 ./build.sh
 ```
+
+Omit the `git checkout` to build the latest development revision instead of the
+most recent release.
 
 The build produces `build/Mac CAD Preview.app`. Move it wherever you want it to
 live, then launch it once:
@@ -67,6 +71,20 @@ ad-hoc signed. macOS quarantines ad-hoc signed apps downloaded from the internet
 and quarantined apps register their Quick Look extensions unreliably. Code you
 compile yourself is never quarantined, so building from source is the install
 path that actually works. It takes a few seconds.
+
+### Versions
+
+Releases are tagged, and [CHANGELOG.md](CHANGELOG.md) records what changed in
+each. To check what you have installed, open the app — the version is on the
+window — or ask the bundle directly:
+
+```bash
+/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+    "/Applications/Mac CAD Preview.app/Contents/Info.plist"
+```
+
+To update, pull and rebuild, then relaunch the app once so macOS picks up the
+new extension. [RELEASING.md](RELEASING.md) covers cutting a release.
 
 ## Use
 

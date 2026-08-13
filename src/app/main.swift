@@ -17,8 +17,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Mac CAD Preview"
         window.center()
 
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")
+            as? String ?? "unknown"
+
         let text = NSTextField(labelWithString: """
-        Mac CAD Preview is installed.
+        Mac CAD Preview \(version) is installed.
 
         Select a STEP, IGES or STL file
         in Finder and press the spacebar.

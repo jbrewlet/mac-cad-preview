@@ -5,6 +5,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD="$ROOT/build"
+# Single source of truth for the version. The Info.plists are stamped from it
+# below rather than edited by hand, so a release is a one line change here.
+VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
 APP="$BUILD/Mac CAD Preview.app"
 APPEX="$APP/Contents/PlugIns/MacCADPreviewQL.appex"
 FRAMEWORKS="$APPEX/Contents/Frameworks"
@@ -19,6 +22,17 @@ OCC_LIBS=(TKernel TKMath TKG2d TKG3d TKGeomBase TKGeomAlgo TKBRep TKTopAlgo TKXC
           TKMesh TKShHealing TKXSBase TKDESTEP TKDEIGES TKDESTL)
 
 say() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
+
+# CFBundleShortVersionString is what the user sees; CFBundleVersion is what
+# macOS compares to decide an app has been updated. Both track VERSION.
+stamp_version() {
+    /usr/libexec/PlistBuddy \
+        -c "Set :CFBundleShortVersionString $VERSION" \
+        -c "Set :CFBundleVersion $VERSION" \
+        "$1" >/dev/null
+}
+
+say "Building Mac CAD Preview $VERSION"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -38,6 +52,7 @@ say "Building probe CLI"
 clang++ -std=c++17 -O2 \
     -target "${ARCH}-apple-macos${DEPLOY}" \
     -I"$OCC/include/opencascade" -I"$ROOT/src/core" \
+    -DCADPROBE_VERSION="\"$VERSION\"" \
     "$TMP/cadmesh.o" "$ROOT/src/core/probe_main.cpp" \
     -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -Wl,-rpath,"$OCC/lib" \
     -o "$BUILD/cadprobe"
@@ -51,6 +66,7 @@ swiftc -O \
     -o "$APP/Contents/MacOS/MacCADPreview" \
     "$ROOT/src/app/main.swift"
 cp "$ROOT/src/app/Info.plist" "$APP/Contents/Info.plist"
+stamp_version "$APP/Contents/Info.plist"
 
 # ----------------------------------------------------------- ql extension
 # An .appex has no main(); its entry point is NSExtensionMain from Foundation.
@@ -69,6 +85,7 @@ swiftc -O \
     -o "$APPEX/Contents/MacOS/MacCADPreviewQL" \
     "$ROOT/src/qlext/PreviewViewController.swift" "$ROOT/src/qlext/MeshData.swift"
 cp "$ROOT/src/qlext/Info.plist" "$APPEX/Contents/Info.plist"
+stamp_version "$APPEX/Contents/Info.plist"
 
 # ------------------------------------------------------------- dylib bundling
 # A sandboxed extension cannot be relied on to load libraries out of
@@ -149,4 +166,4 @@ codesign --force --sign - \
 
 codesign --verify --deep --strict "$APP"
 
-say "Built $APP ($(du -sh "$APP" | cut -f1))"
+say "Built $APP — version $VERSION ($(du -sh "$APP" | cut -f1))"
