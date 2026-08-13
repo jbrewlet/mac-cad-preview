@@ -33,11 +33,24 @@ version is never edited anywhere else.
        "build/Mac CAD Preview.app/Contents/Info.plist"
    ```
 
-4. Preview a file of each supported format — STEP, IGES and STL — from the built
-   app. `tests/` has a spike model in STEP and STL. There is no automated test
-   suite, so this is the gate.
+4. Check the geometry pipeline against all three fixtures:
 
-5. Commit, tag and push. The tag goes on `main`:
+   ```bash
+   for f in tests/spike.step tests/spike.iges tests/spike.stl; do
+       ./build/cadprobe "$f" || echo "FAILED $f"
+   done
+   ```
+
+   Each should report the same 40.0 × 24.0 × 26.0 bounding box. The STEP and
+   IGES fixtures carry two colours; the STL one, which cannot carry colour, one.
+
+5. Preview each of `tests/spike.step`, `tests/spike.iges` and `tests/spike.stl`
+   from the Finder with the built app installed. Step 4 does not cover Quick
+   Look itself — the extension registering, the panel appearing within the
+   response timeout, and the controls responding. There is no automated test
+   suite, so these two steps together are the gate.
+
+6. Commit, tag and push. The tag goes on `main`:
 
    ```bash
    git commit -am "Release 0.2.0"
@@ -46,7 +59,7 @@ version is never edited anywhere else.
    git push origin v0.2.0
    ```
 
-6. Publish the GitHub release at
+7. Publish the GitHub release at
    <https://github.com/jbrewlet/mac-cad-preview/releases/new>, choosing the tag
    just pushed and pasting that version's changelog section as the body.
 
