@@ -8,85 +8,45 @@ and you get a blank document icon. This adds a Quick Look extension that reads
 the file, tessellates the real B-rep geometry, and shows an interactive 3D model
 you can orbit, zoom and inspect without opening Fusion.
 
-## Supported formats
-
-| Format | Extensions | Colours |
-|:-------|:-----------|:--------|
-| STEP | `.step`, `.stp`, `.p21` | yes |
-| IGES | `.iges`, `.igs` | yes |
-| STL | `.stl` | no (the format has none) |
-
-STEP and IGES are boundary representation formats: they describe trimmed NURBS
-surfaces rather than triangles, so they have to be tessellated before anything
-can draw them. That work is done by [OpenCASCADE](https://dev.opencascade.org).
-
-Model colours are read from the file where the exporter wrote them. STEP stores
-these as `styled_item` entities, and they can be attached to a whole solid or to
-an individual face. Not every exporter writes them, so a part with no colour
-data falls back to neutral grey.
-
-## Requirements
-
-* An Apple Silicon Mac. Intel is not supported.
-* macOS 12 or later.
-* Xcode is **not** required. Command Line Tools are enough:
-
-  ```bash
-  xcode-select --install
-  ```
-
-* [Homebrew](https://brew.sh), used for the one dependency.
-
 ## Install
 
-```bash
-brew install opencascade
-git clone https://github.com/jbrewlet/mac-cad-preview.git
-cd mac-cad-preview
-git checkout v0.1.0
-./build.sh
-```
+You need an Apple Silicon Mac running macOS 12 or later. You do not need to know
+what any of the following does.
 
-Omit the `git checkout` to build the latest development revision instead of the
-most recent release.
-
-The build produces `build/Mac CAD Preview.app`. Move it wherever you want it to
-live, then launch it once:
+Open Terminal — press Command and Space, type `Terminal`, press Return — then
+paste these three lines in, one at a time, pressing Return after each:
 
 ```bash
-mv "build/Mac CAD Preview.app" /Applications/
-open "/Applications/Mac CAD Preview.app"
+curl -fsSLO https://raw.githubusercontent.com/jbrewlet/mac-cad-preview/main/install.sh
+less install.sh
+bash install.sh
 ```
 
-That launch is what registers the Quick Look extension with macOS. The app
-itself does nothing else, so quit it straight away. Previews keep working
-without it running.
-
-Select a `.step` file in the Finder and press space.
-
-### Why you build it instead of downloading it
-
-There is no Apple Developer ID behind this project, so any prebuilt app would be
-ad-hoc signed. macOS quarantines ad-hoc signed apps downloaded from the internet,
-and quarantined apps register their Quick Look extensions unreliably. Code you
-compile yourself is never quarantined, so building from source is the install
-path that actually works. It takes a few seconds.
-
-### Versions
-
-Releases are tagged, and [CHANGELOG.md](CHANGELOG.md) records what changed in
-each. To check what you have installed, open the app — the version is on the
-window — or ask the bundle directly:
+The middle line just shows you the script before you run it, which is worth
+doing with anything you are about to paste into a terminal. Press `q` to close
+it. If you would rather skip that and get on with it:
 
 ```bash
-/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
-    "/Applications/Mac CAD Preview.app/Contents/Info.plist"
+curl -fsSL https://raw.githubusercontent.com/jbrewlet/mac-cad-preview/main/install.sh | bash -s -- --yes
 ```
 
-To update, pull and rebuild, then relaunch the app once so macOS picks up the
-new extension. [RELEASING.md](RELEASING.md) covers cutting a release.
+The installer checks your Mac can run the app, installs the one thing it depends
+on, builds it, puts it in your Applications folder, and opens it once so macOS
+notices it. Expect it to take several minutes the first time, most of that
+spent downloading — the geometry library it builds against is a few hundred
+megabytes. Everything it touches is on your own machine.
 
-## Use
+If it asks to install [Homebrew](https://brew.sh), that is a package manager for
+macOS, and it is how the geometry library gets installed. Answering no stops the
+install.
+
+When it finishes, select a `.step`, `.iges` or `.stl` file in the Finder and
+press the spacebar.
+
+The window that opens during install is just there so macOS can find the
+preview extension. You can quit it. Previews keep working without it running.
+
+## Using it
 
 | Action | Gesture |
 |:-------|:--------|
@@ -106,6 +66,143 @@ triangle count. When a model has more than one colour, a **Model colours**
 checkbox appears in the bottom right. Switch it off to see the whole part in a
 single neutral finish, which is often easier to read shape from. It is hidden
 for single colour models, where it would do nothing.
+
+The first preview of a large file can take a few seconds. Every preview of that
+same file afterwards is instant, because the result is cached.
+
+## Supported formats
+
+| Format | Extensions | Colours |
+|:-------|:-----------|:--------|
+| STEP | `.step`, `.stp`, `.p21` | yes |
+| IGES | `.iges`, `.igs` | yes |
+| STL | `.stl` | no (the format has none) |
+
+Model colours are read from the file where the exporter wrote them. Not every
+exporter writes them, so a part with no colour data falls back to neutral grey.
+
+## Updating
+
+Run the installer again. It replaces what is already there.
+
+To see which version you have, open Mac CAD Preview from your Applications
+folder — the version is on the window. [CHANGELOG.md](CHANGELOG.md) records what
+changed in each release.
+
+## Uninstall
+
+```bash
+rm -rf "/Applications/Mac CAD Preview.app"
+rm -rf ~/Library/Containers/com.maccadpreview.quicklook
+```
+
+macOS removes the extension registration when the containing app goes away.
+
+## If something is wrong
+
+**Nothing happens, or the preview is blank.** Open Mac CAD Preview from your
+Applications folder once, then try the preview again. That launch is what
+registers the extension. To confirm macOS can see it:
+
+```bash
+pluginkit -m -i com.maccadpreview.quicklook
+```
+
+A leading `+` means it is registered and enabled. If you moved the app after
+installing it, macOS may still be pointing at the old location:
+
+```bash
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/Mac CAD Preview.app"
+```
+
+**One particular file will not open.** Some CAD tools write compressed data into
+a plain `.step` file, which is not yet handled. Check with:
+
+```bash
+file yourpart.step
+```
+
+If it reports `gzip compressed data`, that is the known limitation below.
+
+**Anything else.** The extension writes to the system log:
+
+```bash
+log stream --level info --predicate 'subsystem == "com.maccadpreview"'
+```
+
+Note that `log` is also a zsh builtin, so use `/usr/bin/log` if that command
+behaves strangely.
+
+## Known limitations
+
+* gzip compressed STEP files are rejected rather than decompressed.
+* No Finder icon thumbnails yet. Files still show a generic icon in icon view;
+  the preview only appears on spacebar.
+* No OBJ, PLY or 3MF support yet.
+* Apple Silicon only. Intel is not supported.
+
+## Support
+
+This is free and always will be. If it saved you from opening Fusion just to
+look at a part, you can [buy me a coffee](https://buymeacoffee.com/jbrw).
+
+---
+
+The rest of this is for people who want to build it themselves or understand how
+it works.
+
+## Building it yourself
+
+The installer above does all of this for you. Doing it by hand:
+
+```bash
+xcode-select --install          # Command Line Tools; Xcode is not required
+brew install opencascade
+git clone https://github.com/jbrewlet/mac-cad-preview.git
+cd mac-cad-preview
+git checkout "$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
+./build.sh
+```
+
+Omit the `git checkout` to build the latest development revision instead of the
+most recent release.
+
+The build produces `build/Mac CAD Preview.app`. Move it where it should live,
+then launch it once to register the extension:
+
+```bash
+mv "build/Mac CAD Preview.app" /Applications/
+open "/Applications/Mac CAD Preview.app"
+```
+
+To check what a built bundle reports as its version:
+
+```bash
+/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+    "/Applications/Mac CAD Preview.app/Contents/Info.plist"
+```
+
+[RELEASING.md](RELEASING.md) covers cutting a release. `tests/` holds one model
+per supported format, and `tests/README.md` describes what each covers.
+
+### Why it builds instead of downloading a finished app
+
+There is no Apple Developer ID behind this project, so any prebuilt app would be
+ad-hoc signed. macOS quarantines ad-hoc signed apps downloaded from the internet,
+and quarantined apps register their Quick Look extensions unreliably. Code you
+compile yourself is never quarantined, so building from source is the install
+path that actually works. The build itself takes a few seconds; the dependency
+download is the slow part.
+
+## Formats and tessellation
+
+STEP and IGES are boundary representation formats: they describe trimmed NURBS
+surfaces rather than triangles, so they have to be tessellated before anything
+can draw them. That work is done by [OpenCASCADE](https://dev.opencascade.org).
+
+STEP stores colours as `styled_item` entities, and they can be attached to a
+whole solid or to an individual face. Triangles are grouped by colour and drawn
+one draw call per group.
 
 ## Performance
 
@@ -136,58 +233,6 @@ capped at 512 MB and evicts the least recently used entries first. To clear it:
 rm -rf ~/Library/Containers/com.maccadpreview.quicklook/Data/Library/Caches/MacCADPreview
 ```
 
-## Uninstall
-
-```bash
-rm -rf "/Applications/Mac CAD Preview.app"
-rm -rf ~/Library/Containers/com.maccadpreview.quicklook
-```
-
-macOS removes the extension registration when the containing app goes away.
-
-## Troubleshooting
-
-**Nothing happens, or the preview is blank.** Confirm macOS can see the
-extension:
-
-```bash
-pluginkit -m -i com.maccadpreview.quicklook
-```
-
-A leading `+` means it is registered and enabled. If you get nothing back, launch
-the app once more. If you moved the app after first launching it, macOS may still
-be pointing at the old location:
-
-```bash
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/Mac CAD Preview.app"
-```
-
-**A specific file will not open.** Some exporters write gzip compressed data
-into a plain `.step` file, which is not yet handled. Check with:
-
-```bash
-file yourpart.step
-```
-
-If it reports `gzip compressed data`, that is the known limitation below.
-
-**Diagnosing anything else.** The extension logs to the unified log:
-
-```bash
-log stream --level info --predicate 'subsystem == "com.maccadpreview"'
-```
-
-Note that `log` is also a zsh builtin, so use `/usr/bin/log` if that command
-behaves strangely.
-
-## Known limitations
-
-* gzip compressed STEP files are rejected rather than decompressed.
-* No Finder icon thumbnails yet. Files still show a generic icon in icon view;
-  the preview only appears on spacebar.
-* No OBJ, PLY or 3MF support yet.
-* Apple Silicon only.
-
 ## How it works
 
 `build.sh` assembles two bundles by hand, with no Xcode project involved:
@@ -210,11 +255,6 @@ needs into the bundle and rewrites the load commands to point inside it. That is
 Quick Look also kills extensions that take too long to respond, which a 19 second
 parse would trip. So the panel is put on screen and reported ready immediately,
 and the geometry is filled in from a background queue when it is available.
-
-## Support
-
-This is free and always will be. If it saved you from opening Fusion just to
-look at a part, you can [buy me a coffee](https://buymeacoffee.com/jbrw).
 
 ## Licence
 

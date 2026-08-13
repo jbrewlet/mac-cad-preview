@@ -59,6 +59,12 @@ version is never edited anywhere else.
    git push origin v0.2.0
    ```
 
+   Pushing the tag is what ships the release: `install.sh` installs the newest
+   `v*` tag, so until it is pushed, anyone running the installer still gets the
+   previous version. `install.sh` is fetched from `main`, so a change to the
+   installer itself takes effect when `main` is pushed rather than when the tag
+   is.
+
 7. Publish the GitHub release at
    <https://github.com/jbrewlet/mac-cad-preview/releases/new>, choosing the tag
    just pushed and pasting that version's changelog section as the body.
@@ -67,3 +73,7 @@ version is never edited anywhere else.
    so a downloaded ad-hoc signed app gets quarantined by macOS, and quarantined
    apps register their Quick Look extension unreliably. Shipping one would hand
    people an install that silently does not work.
+
+8. Run `./install.sh` once with nothing passed to it, which is the path an end
+   user takes. It should pick up the tag just pushed, and the version on the app
+   window should be the one being released.
