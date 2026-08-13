@@ -10,41 +10,42 @@ you can orbit, zoom and inspect without opening Fusion.
 
 ## Install
 
-You need an Apple Silicon Mac running macOS 12 or later. You do not need to know
-what any of the following does.
+Needs an Apple Silicon Mac running macOS 12 or later. No Terminal, and nothing
+else to install.
 
-Open Terminal — press Command and Space, type `Terminal`, press Return — then
-paste these three lines in, one at a time, pressing Return after each:
+1. Download the `.dmg` from the
+   [latest release](https://github.com/jbrewlet/mac-cad-preview/releases/latest).
 
-```bash
-curl -fsSLO https://raw.githubusercontent.com/jbrewlet/mac-cad-preview/main/install.sh
-less install.sh
-bash install.sh
-```
+2. Open it and drag **Mac CAD Preview** onto the Applications folder beside it.
 
-The middle line just shows you the script before you run it, which is worth
-doing with anything you are about to paste into a terminal. Press `q` to close
-it. If you would rather skip that and get on with it:
+3. Open your Applications folder and double click Mac CAD Preview. **macOS will
+   refuse to open it**, saying it cannot check it for malicious software. That is
+   expected — see below.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/jbrewlet/mac-cad-preview/main/install.sh | bash -s -- --yes
-```
+4. Open System Settings, go to **Privacy & Security**, and scroll down to
+   **Security**. There is a message about Mac CAD Preview being blocked, with an
+   **Open Anyway** button. Click it and enter your password.
 
-The installer checks your Mac can run the app, installs the one thing it depends
-on, builds it, puts it in your Applications folder, and opens it once so macOS
-notices it. Expect it to take several minutes the first time, most of that
-spent downloading — the geometry library it builds against is a few hundred
-megabytes. Everything it touches is on your own machine.
+5. The app opens and shows its version. Quit it. That launch is all macOS needed;
+   previews work whether or not the app is running.
 
-If it asks to install [Homebrew](https://brew.sh), that is a package manager for
-macOS, and it is how the geometry library gets installed. Answering no stops the
-install.
+6. Select a `.step`, `.iges` or `.stl` file in the Finder and press the spacebar.
 
-When it finishes, select a `.step`, `.iges` or `.stl` file in the Finder and
-press the spacebar.
+### Why macOS blocks it, and why step 4 matters
 
-The window that opens during install is just there so macOS can find the
-preview extension. You can quit it. Previews keep working without it running.
+Apple charges 99 US dollars a year for the certificate that would let this open
+without a warning. This is free software and does not have one, so macOS cannot
+confirm who built it and asks you to confirm instead.
+
+Step 4 is not optional. macOS quarantines anything downloaded from the internet,
+and a quarantined app is not allowed to load its Quick Look extension, so the
+spacebar will do nothing until you approve the app. Approving it is what lifts
+the quarantine.
+
+Everything in the download is compiled from the source in this repository. If
+you would rather not take that on trust, [build it yourself](#building-it-yourself)
+— the result is the same app, and a locally compiled one is never quarantined,
+so it skips steps 3 and 4 entirely.
 
 ## Using it
 
@@ -83,7 +84,9 @@ exporter writes them, so a part with no colour data falls back to neutral grey.
 
 ## Updating
 
-Run the installer again. It replaces what is already there.
+Download the new `.dmg` and drag the app across, replacing the copy in
+Applications. Then open it once, as in step 4 above — a fresh download is
+quarantined like any other, so it needs approving again.
 
 To see which version you have, open Mac CAD Preview from your Applications
 folder — the version is on the window. [CHANGELOG.md](CHANGELOG.md) records what
@@ -100,16 +103,29 @@ macOS removes the extension registration when the containing app goes away.
 
 ## If something is wrong
 
-**Nothing happens, or the preview is blank.** Open Mac CAD Preview from your
-Applications folder once, then try the preview again. That launch is what
-registers the extension. To confirm macOS can see it:
+**Nothing happens, or the preview is blank.** Almost always this is step 4 of
+the install: the app is in Applications but has never been approved, so it is
+still quarantined and macOS will not let it load the preview. Double click the
+app, then approve it under System Settings → Privacy & Security → Open Anyway.
+Opening it once is also what registers the extension in the first place.
+
+To confirm macOS can see the extension:
 
 ```bash
 pluginkit -m -i com.maccadpreview.quicklook
 ```
 
-A leading `+` means it is registered and enabled. If you moved the app after
-installing it, macOS may still be pointing at the old location:
+A leading `+` means it is registered and enabled. Nothing at all means it is not
+registered, which is the quarantine case above. If you would rather clear the
+quarantine directly than click through System Settings:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Mac CAD Preview.app"
+open "/Applications/Mac CAD Preview.app"
+```
+
+If you moved the app after installing it, macOS may still be pointing at the old
+location:
 
 ```bash
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/Mac CAD Preview.app"
@@ -153,7 +169,22 @@ it works.
 
 ## Building it yourself
 
-The installer above does all of this for you. Doing it by hand:
+An app you compiled is never quarantined, so building skips the Gatekeeper
+approval the download needs. One command does the lot — it checks your Mac is
+supported, installs [Homebrew](https://brew.sh) and OpenCASCADE if they are
+missing, builds the newest release, and installs it:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/jbrewlet/mac-cad-preview/main/install.sh
+less install.sh    # read it before running it; q to quit
+bash install.sh
+```
+
+Pass `--ref main` to build the latest development revision instead of the newest
+release, or `--yes` to skip the prompt before Homebrew is installed. Expect it to
+take several minutes, nearly all of it downloading OpenCASCADE.
+
+By hand, if you prefer:
 
 ```bash
 xcode-select --install          # Command Line Tools; Xcode is not required
@@ -185,14 +216,29 @@ To check what a built bundle reports as its version:
 [RELEASING.md](RELEASING.md) covers cutting a release. `tests/` holds one model
 per supported format, and `tests/README.md` describes what each covers.
 
-### Why it builds instead of downloading a finished app
+### Packaging a release
 
-There is no Apple Developer ID behind this project, so any prebuilt app would be
-ad-hoc signed. macOS quarantines ad-hoc signed apps downloaded from the internet,
-and quarantined apps register their Quick Look extensions unreliably. Code you
-compile yourself is never quarantined, so building from source is the install
-path that actually works. The build itself takes a few seconds; the dependency
-download is the slow part.
+`./package.sh` builds the app and wraps it in `build/MacCADPreview-<version>.dmg`,
+alongside a link to Applications and the install instructions. It prints the
+image's SHA-256, which goes in the release notes so the download can be checked.
+
+The app bundle is self contained — `build.sh` copies all 30 OpenCASCADE dylibs
+into it and rewrites their load paths — so the image runs on a Mac with no
+Homebrew, no Command Line Tools and nothing else installed. It is 16 MB
+compressed.
+
+### Signing
+
+There is no Apple Developer ID behind this project, so both bundles are ad-hoc
+signed. That is enough for macOS to run them, but not enough for Gatekeeper to
+vouch for them, which is why a downloaded copy has to be approved once in
+System Settings before its Quick Look extension will load. A locally compiled
+copy is never quarantined and needs no approval.
+
+The extension is signed with its own entitlements rather than with
+`codesign --deep`, and it keeps `com.apple.security.app-sandbox`. Both matter:
+PlugInKit silently refuses to register a Quick Look extension that is not
+sandboxed, and `--deep` would flatten the entitlements of everything it touches.
 
 ## Formats and tessellation
 

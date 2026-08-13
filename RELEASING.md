@@ -65,15 +65,32 @@ version is never edited anywhere else.
    installer itself takes effect when `main` is pushed rather than when the tag
    is.
 
-7. Publish the GitHub release at
+7. Build the disk image, and keep the SHA-256 it prints:
+
+   ```bash
+   ./package.sh
+   ```
+
+8. Publish the GitHub release at
    <https://github.com/jbrewlet/mac-cad-preview/releases/new>, choosing the tag
-   just pushed and pasting that version's changelog section as the body.
+   just pushed and pasting that version's changelog section as the body. Attach
+   `build/MacCADPreview-<version>.dmg` and quote its SHA-256 in the notes — with
+   no Developer ID behind the app, that checksum is the only way someone can
+   confirm what they downloaded is what was built.
 
-   Do not attach a built `.app`. There is no Developer ID behind this project,
-   so a downloaded ad-hoc signed app gets quarantined by macOS, and quarantined
-   apps register their Quick Look extension unreliably. Shipping one would hand
-   people an install that silently does not work.
+   The README sends people to `releases/latest`, so a release without the `.dmg`
+   attached leaves them with nothing to download.
 
-8. Run `./install.sh` once with nothing passed to it, which is the path an end
-   user takes. It should pick up the tag just pushed, and the version on the app
-   window should be the one being released.
+9. Install from the release the way an end user does: download the `.dmg`, drag
+   the app to Applications, approve it under Privacy & Security, and preview a
+   file. This is the only step that covers the quarantine approval, which is
+   what stands between a download and a working preview.
+
+   Then check the source path still works, which skips quarantine entirely:
+
+   ```bash
+   ./install.sh
+   ```
+
+   It should pick up the tag just pushed, and the version on the app window
+   should be the one being released.

@@ -34,9 +34,13 @@ First release.
   with least-recently-used eviction.
 * Asynchronous geometry loading, so a slow parse does not trip Quick Look's
   extension response timeout.
-* `install.sh`, a single command install for people who do not build software:
-  it checks the machine is supported, gets Homebrew and OpenCASCADE if they are
-  missing, builds, installs to `/Applications`, and registers the extension.
+* A downloadable disk image, built by `package.sh`, so installing is drag the
+  app to Applications and approve it once under Privacy & Security. The bundle
+  is self contained, so nothing else has to be installed first.
+* `install.sh`, a single command install from source for anyone who would rather
+  compile it, which also avoids the Gatekeeper approval: it checks the machine is
+  supported, gets Homebrew and OpenCASCADE if they are missing, builds, installs
+  to `/Applications`, and registers the extension.
 * `build.sh`, which builds both bundles without an Xcode project, walks the
   OpenCASCADE dependency graph to bundle every dylib the sandboxed extension
   needs, and ad-hoc signs the result.
