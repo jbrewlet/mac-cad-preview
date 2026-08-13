@@ -195,6 +195,7 @@ register_extension() {
         say "Registered"
     else
         warn "macOS is not reporting the extension yet. Open \"$APP_NAME\" from $INSTALL_DIR once by hand, then try a preview."
+        warn "If that does not help, ./doctor.sh will say why."
     fi
 }
 

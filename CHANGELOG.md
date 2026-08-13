@@ -9,6 +9,23 @@ and the patch version for everything else.
 
 ## [Unreleased]
 
+### Added
+
+* `doctor.sh`, a read-only diagnostic for previews that do not appear. It checks
+  the machine, the install location, quarantine, the signature, the extension's
+  sandbox entitlement and registration, and how macOS classifies a given file,
+  then prints each problem with the command that fixes it. Quick Look routes on
+  content type rather than filename, so a file macOS classifies as another app's
+  type is never offered to the extension, which looks identical to the spacebar
+  doing nothing.
+
+### Changed
+
+* README troubleshooting leads with `doctor.sh`, covers the Quick Look switch
+  under System Settings → General → Login Items & Extensions, and no longer
+  claims a leading `+` is the only healthy `pluginkit` state — a blank first
+  column is the normal one.
+
 ## [0.2.0] - 2026-08-13
 
 ### Added

@@ -116,10 +116,27 @@ macOS removes the extension registration when the containing app goes away.
 
 ## If something is wrong
 
-**Nothing happens, or the preview is blank.** Almost always this is step 4 of
-the install: the app is in Applications but has never been approved, so it is
-still quarantined and macOS will not let it load the preview. Double click the
-app, then approve it under System Settings → Privacy & Security → Open Anyway.
+**Start here.** `doctor.sh` checks the whole chain — your Mac, the install,
+Gatekeeper, the extension's registration, and how macOS classifies the file you
+are trying to preview — and prints what is wrong along with the command that
+fixes it. It only reads; it changes nothing.
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/jbrewlet/mac-cad-preview/main/doctor.sh
+bash doctor.sh yourpart.step
+```
+
+If it finds nothing wrong, paste its output into an
+[issue](https://github.com/jbrewlet/mac-cad-preview/issues) — it is exactly what
+is needed to work out what happened.
+
+The rest of this section is what it checks, in case you would rather look
+yourself.
+
+**Nothing happens, or the preview is blank.** Usually this is step 4 of the
+install: the app is in Applications but has never been approved, so it is still
+quarantined and macOS will not let it load the preview. Double click the app,
+then approve it under System Settings → Privacy & Security → Open Anyway.
 Opening it once is also what registers the extension in the first place.
 
 To confirm macOS can see the extension:
@@ -128,9 +145,13 @@ To confirm macOS can see the extension:
 pluginkit -m -i com.maccadpreview.quicklook
 ```
 
-A leading `+` means it is registered and enabled. Nothing at all means it is not
-registered, which is the quarantine case above. If you would rather clear the
-quarantine directly than click through System Settings:
+Nothing at all means it is not registered, which is the quarantine case above. A
+line with a leading `-` means it is registered but switched off, which you can
+turn back on under System Settings → General → Login Items & Extensions → Quick
+Look. A `+`, or a blank first column, means it is on.
+
+If you would rather clear the quarantine directly than click through System
+Settings:
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/Mac CAD Preview.app"
@@ -143,6 +164,19 @@ location:
 ```bash
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/Mac CAD Preview.app"
 ```
+
+**The extension is registered and the spacebar still does nothing.** Quick Look
+routes on what macOS thinks a file *is*, not on its name, so check that:
+
+```bash
+mdls -name kMDItemContentType yourpart.step
+```
+
+It should say `com.maccadpreview.step` (or `com.maccadpreview.iges`,
+`com.maccadpreview.3mf`, or `public.standard-tesselated-geometry-format` for
+STL). A `dyn.` value means macOS has not registered the file types yet, which
+opening the app once fixes. Any other app's identifier means that app has
+claimed the type, and it needs adding to the extension — please report it.
 
 **One particular file will not open.** Some CAD tools write compressed data into
 a plain `.step` file, which is not yet handled. Check with:
