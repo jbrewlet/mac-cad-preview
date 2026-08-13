@@ -1,0 +1,6 @@
+# Build output — contains the bundled OpenCASCADE dylibs (~39 MB), rebuildable
+# from source with ./build.sh
+build/
+
+.DS_Store
+*.swp
