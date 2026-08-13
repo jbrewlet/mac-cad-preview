@@ -9,6 +9,21 @@ and the patch version for everything else.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-13
+
+### Added
+
+* **Open in Fusion** button on STEP and IGES Quick Look previews when Autodesk
+  Fusion is installed. A sandboxed extension cannot launch other apps directly,
+  so an on-demand XPC helper embedded in the extension opens the file through
+  Launch Services and reuses a running Fusion instance when possible.
+* Basic **3MF** (`.3mf`) mesh preview support.
+* Version number shown in the host app welcome window, read from the bundle.
+
+### Changed
+
+* Known limitations updated: 3MF is supported; OBJ and PLY are still not.
+
 ## [0.1.0] - 2026-08-13
 
 First release.
@@ -55,5 +70,6 @@ First release.
 * No Finder icon thumbnails. The preview only appears on spacebar.
 * No OBJ, PLY or 3MF support.
 
-[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.1.0
