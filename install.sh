@@ -195,6 +195,7 @@ register_extension() {
         say "Registered"
     else
         warn "macOS is not reporting the extension yet. Open \"$APP_NAME\" from $INSTALL_DIR once by hand, then try a preview."
+        warn "If that does not help, ./doctor.sh will say why."
     fi
 }
 
@@ -209,7 +210,7 @@ main() {
 
     printf '\n'
     say "Done"
-    printf 'Select a STEP, IGES or STL file in the Finder and press the spacebar.\n'
+    printf 'Select a STEP, IGES, STL, 3MF, NC or TAP file in the Finder and press the spacebar.\n'
 }
 
 main "$@"

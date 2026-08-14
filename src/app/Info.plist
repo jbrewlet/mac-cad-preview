@@ -37,26 +37,6 @@
 		</dict>
 	</array>
 
-	<key>CFBundleDocumentTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeExtensions</key>
-			<array>
-				<string>3mf</string>
-			</array>
-			<key>CFBundleTypeName</key>
-			<string>3MF Model</string>
-			<key>CFBundleTypeRole</key>
-			<string>Viewer</string>
-			<key>LSHandlerRank</key>
-			<string>Owner</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>com.maccadpreview.3mf</string>
-			</array>
-		</dict>
-	</array>
-
 	<!-- macOS ships no UTI for STEP or IGES, so we declare them. STL, OBJ and
 	     PLY already have system UTIs and must NOT be redeclared here. -->
 	<key>UTExportedTypeDeclarations</key>
@@ -140,8 +120,10 @@
 		</dict>
 	</array>
 
-	<!-- Other apps (e.g. BeLighten ModelShow) claim their own 3MF UTIs; import
-	     them so Quick Look can still route .3mf files to our extension. -->
+	<!-- Other CAD apps export their own UTIs for these extensions, and
+	     whichever one Launch Services picked is what Quick Look routes on.
+	     Import those types and list them in the extension so a file labelled
+	     by Shapr3D or BeLighten still gets a preview. -->
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
@@ -152,6 +134,45 @@
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
+				<string>public.3d-content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>3mf</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.shapr3d.step</string>
+			<key>UTTypeDescription</key>
+			<string>STEP CAD Model</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.3d-content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>step</string>
+					<string>stp</string>
+					<string>stpz</string>
+					<string>p21</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.shapr3d.3d-manufacturing.3mf</string>
+			<key>UTTypeDescription</key>
+			<string>3D Manufacturing Format</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
 				<string>public.3d-content</string>
 			</array>
 			<key>UTTypeTagSpecification</key>

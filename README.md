@@ -63,10 +63,12 @@ so it skips steps 3 and 4 entirely.
 | Zoom | Scroll (toward the pointer by default; both that and the direction are in Settings) |
 | Pan | Two finger drag, or right button drag |
 
-The first view frames the whole model with a little space to the edge of the
-panel. Zoom moves the camera toward whatever is under the pointer rather than
-the centre of the window, and rotation re-anchors on the point you zoomed into,
-so you can dive into a specific feature and keep turning around it.
+The first view frames the tessellated part with a little space to the edge of
+the panel, not the untrimmed NURBS hull — so a Rhino STEP file is not a speck
+in a huge empty frame. Zoom moves the camera toward whatever is under the
+pointer rather than the centre of the window, and rotation re-anchors on the
+point you zoomed into, so you can dive into a specific feature and keep
+turning around it.
 
 Models are shown with Z pointing up, matching Fusion, SolidWorks and Inventor,
 rather than SceneKit's default of Y up. That, the starting camera and whether
@@ -94,8 +96,8 @@ preview.
 G-code (`.nc`, `.tap`) is shown as highlighted text rather than a 3D toolpath.
 G and M words, axis addresses, feed and speed, tools and comments are coloured
 so a program is readable at a glance. **A−** and **A+** in the corner change
-the font size; the choice is saved. The same setting is in **Settings** when
-you open Mac CAD Preview.
+the font size; the choice is saved. Line wrapping and the colour theme are
+in **Settings**, with the font size.
 
 The first preview of a large file can take a few seconds. The panel says
 whether it is parsing or tessellating, and warns when the file is large enough
@@ -136,11 +138,27 @@ macOS removes the extension registration when the containing app goes away.
 
 ## If something is wrong
 
-**Nothing happens, or the preview is blank.** Almost always this is step 4 of
-the install: the app is in Applications but has never been approved, so it is
-still quarantined and macOS will not let it load the preview. Double click the
-app, then approve it under System Settings → Privacy & Security → Open Anyway.
-Opening it once is also what registers the extension in the first place.
+Run this first. It prints each problem and the command that fixes it:
+
+```bash
+./doctor.sh yourpart.step
+```
+
+From a clone, or download `doctor.sh` from the repo and run it the same way.
+It is read-only.
+
+**Nothing happens, or the preview is blank.** Usually one of these:
+
+1. The app is still quarantined (install step 4). Double click it, then
+   approve it under System Settings → Privacy & Security → Open Anyway.
+   Opening it once is also what registers the extension.
+
+2. The Quick Look extension is off. System Settings → General → Login Items
+   & Extensions → Quick Look, and enable Mac CAD Preview.
+
+3. Another app has claimed the file type. Quick Look routes on the type
+   macOS assigned, not the filename. `doctor.sh` names the type and the app.
+   If it is one we do not handle yet, open an issue with that line.
 
 To confirm macOS can see the extension:
 
@@ -148,9 +166,9 @@ To confirm macOS can see the extension:
 pluginkit -m -i com.maccadpreview.quicklook
 ```
 
-A leading `+` means it is registered and enabled. Nothing at all means it is not
-registered, which is the quarantine case above. If you would rather clear the
-quarantine directly than click through System Settings:
+A leading `+` means it is registered and enabled. A blank first column can
+still be registered. Nothing at all means it is not registered, which is the
+quarantine case above. To clear the quarantine directly:
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/Mac CAD Preview.app"
@@ -176,11 +194,8 @@ If it reports `gzip compressed data`, that is the known limitation below.
 **Anything else.** The extension writes to the system log:
 
 ```bash
-log stream --level info --predicate 'subsystem == "com.maccadpreview"'
+/usr/bin/log stream --level info --predicate 'subsystem == "com.maccadpreview"'
 ```
-
-Note that `log` is also a zsh builtin, so use `/usr/bin/log` if that command
-behaves strangely.
 
 ## Known limitations
 
@@ -247,8 +262,9 @@ To check what a built bundle reports as its version:
     "/Applications/Mac CAD Preview.app/Contents/Info.plist"
 ```
 
-[RELEASING.md](RELEASING.md) covers cutting a release. `tests/` holds one model
-per supported format, and `tests/README.md` describes what each covers.
+[RELEASING.md](RELEASING.md) covers cutting a release. `./doctor.sh` diagnoses
+a preview that does not appear. `tests/` holds one model per supported format,
+and `tests/README.md` describes what each covers.
 
 ### Packaging a release
 

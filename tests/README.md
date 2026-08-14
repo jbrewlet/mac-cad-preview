@@ -1,9 +1,10 @@
 # Fixtures
 
-One model in each supported format: a 40 × 24 × 8 mm plate with 2 mm rounded
-edges and a 12 mm bore, plus a separate 8 mm pin standing on it. All three
-describe the same pair of parts, so all three should report a 40.0 × 24.0 ×
-26.0 bounding box.
+One mesh model in each 3D format: a 40 × 24 × 8 mm plate with 2 mm rounded
+edges and a 12 mm bore, plus a separate 8 mm pin standing on it. The STEP,
+IGES and STL fixtures describe the same pair of parts, so all three should
+report a 40.0 × 24.0 × 26.0 bounding box. G-code fixtures are a text
+preview of that same plate, not a mesh.
 
 | File | Covers |
 | --- | --- |
@@ -15,7 +16,7 @@ The rounded edges and the bore mean these carry toroidal, spherical and
 cylindrical faces, not just planes — a reader that mishandles trimmed surfaces
 fails visibly rather than subtly.
 
-`make_fixtures.cpp` regenerates all three; the compile line is in its header
+`make_fixtures.cpp` regenerates the three mesh fixtures; the compile line is in its header
 comment. The output is committed, so it only needs running when the geometry
 being covered changes.
 

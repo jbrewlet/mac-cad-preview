@@ -9,6 +9,8 @@ and the patch version for everything else.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-13
+
 ### Added
 
 * Quick Look preview for G-code (`.nc`, `.tap`) with syntax colouring for
@@ -30,6 +32,20 @@ and the patch version for everything else.
 * Load status names the stage — parsing, tessellating, or reading a mesh —
   and warns that the first preview of a large STEP or IGES file can take a
   while.
+* `doctor.sh`, a read-only diagnostic for previews that do not appear. It
+  checks the machine, the install, quarantine, the extension's sandbox and
+  registration, and how macOS classifies a given file.
+* Quick Look also handles STEP and 3MF files that macOS has labelled as
+  Shapr3D's types, so a machine with Shapr3D installed still gets a preview.
+
+### Changed
+
+* The host app no longer claims to be the default opener for `.3mf`. Quick
+  Look is unchanged; double-clicking a `.3mf` no longer opens the version
+  window.
+* README troubleshooting leads with `doctor.sh`, covers the Quick Look
+  switch under Login Items & Extensions, and no longer treats a leading
+  `+` as the only healthy `pluginkit` state.
 
 ## [0.2.0] - 2026-08-13
 
@@ -92,6 +108,7 @@ First release.
 * No Finder icon thumbnails. The preview only appears on spacebar.
 * No OBJ, PLY or 3MF support.
 
-[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.1.0
