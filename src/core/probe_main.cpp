@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     const double deflection = (argc > 2) ? std::atof(argv[2]) : -1.0;
 
     const auto start = std::chrono::steady_clock::now();
-    CADMesh *mesh = cadmesh_load(argv[1], deflection);
+    CADMesh *mesh = cadmesh_load(argv[1], deflection, nullptr, nullptr);
     const auto elapsed = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - start).count();
 

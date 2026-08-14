@@ -9,6 +9,9 @@ final class SettingsWindow: NSWindow {
 
     private let colorsCheckbox = NSButton(checkboxWithTitle: "Show by default",
                                           target: nil, action: nil)
+    private let edgesCheckbox = NSButton(checkboxWithTitle: "Show by default",
+                                         target: nil, action: nil)
+    private let projectionPopup = NSPopUpButton()
     private let zoomPopup = NSPopUpButton()
     private let zoomTargetPopup = NSPopUpButton()
     private let upAxisPopup = NSPopUpButton()
@@ -30,7 +33,11 @@ final class SettingsWindow: NSWindow {
 
         colorsCheckbox.target = self
         colorsCheckbox.action = #selector(colorsChanged)
+        edgesCheckbox.target = self
+        edgesCheckbox.action = #selector(edgesChanged)
 
+        fill(projectionPopup, titles: ["Perspective", "Orthographic"],
+             action: #selector(projectionChanged))
         fill(zoomPopup, titles: ["Scroll up zooms in", "Scroll up zooms out"],
              action: #selector(zoomChanged))
         fill(zoomTargetPopup, titles: ZoomTarget.allCases.map(\.title),
@@ -65,6 +72,8 @@ final class SettingsWindow: NSWindow {
 
         let modelGrid = form([
             ("Model colours", colorsCheckbox),
+            ("Edges", edgesCheckbox),
+            ("Projection", projectionPopup),
             ("Zoom", zoomPopup),
             ("Zoom target", zoomTargetPopup),
             ("Up axis", upAxisPopup),
@@ -114,6 +123,14 @@ final class SettingsWindow: NSWindow {
         PreviewPreferences.showModelColors = (colorsCheckbox.state == .on)
     }
 
+    @objc private func edgesChanged() {
+        PreviewPreferences.showEdges = (edgesCheckbox.state == .on)
+    }
+
+    @objc private func projectionChanged() {
+        PreviewPreferences.orthographic = (projectionPopup.indexOfSelectedItem == 1)
+    }
+
     @objc private func zoomChanged() {
         PreviewPreferences.scrollUpZoomsIn = (zoomPopup.indexOfSelectedItem == 0)
     }
@@ -145,6 +162,8 @@ final class SettingsWindow: NSWindow {
 
     private func refresh() {
         colorsCheckbox.state = PreviewPreferences.showModelColors ? .on : .off
+        edgesCheckbox.state = PreviewPreferences.showEdges ? .on : .off
+        projectionPopup.selectItem(at: PreviewPreferences.orthographic ? 1 : 0)
         zoomPopup.selectItem(at: PreviewPreferences.scrollUpZoomsIn ? 0 : 1)
         zoomTargetPopup.selectItem(at: ZoomTarget.allCases.firstIndex(of: PreviewPreferences.zoomTarget) ?? 0)
         upAxisPopup.selectItem(at: UpAxis.allCases.firstIndex(of: PreviewPreferences.upAxis) ?? 0)

@@ -40,9 +40,15 @@ typedef struct CADMesh {
     char *error;
 } CADMesh;
 
+// Optional progress callback. `stage` is a short status line such as
+// "Parsing STEP…" or "Tessellating…". Called from the loading thread.
+typedef void (*cadmesh_progress_fn)(const char *stage, void *context);
+
 // deflection <= 0 means "pick automatically from the bounding box".
-// Returns NULL only on allocation failure; check ->error otherwise.
-CADMesh *cadmesh_load(const char *path, double deflection);
+// `progress` may be NULL. Returns NULL only on allocation failure;
+// check ->error otherwise.
+CADMesh *cadmesh_load(const char *path, double deflection,
+                      cadmesh_progress_fn progress, void *context);
 
 void cadmesh_free(CADMesh *mesh);
 

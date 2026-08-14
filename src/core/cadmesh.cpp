@@ -55,6 +55,10 @@ char *dupString(const std::string &s) {
     return out;
 }
 
+void reportProgress(cadmesh_progress_fn progress, void *context, const char *stage) {
+    if (progress && stage) progress(stage, context);
+}
+
 std::string lowerExtension(const std::string &path) {
     const size_t dot = path.find_last_of('.');
     if (dot == std::string::npos) return "";
@@ -174,10 +178,24 @@ bool readWithColors(const std::string &path, const std::string &ext,
 CADMesh *finalizeMesh(std::vector<float> &positions,
                       std::vector<float> &normals,
                       std::map<ColorKey, std::vector<uint32_t>> &buckets,
-                      int faceCount,
-                      double xMin, double yMin, double zMin,
-                      double xMax, double yMax, double zMax) {
-    if (buckets.empty()) return makeError("Nothing could be tessellated from this model.");
+                      int faceCount) {
+    if (buckets.empty() || positions.size() < 3) {
+        return makeError("Nothing could be tessellated from this model.");
+    }
+
+    // Frame and dimensions come from the triangles we actually drew.
+    // BRepBndLib on Rhino STEP often reports the untrimmed NURBS hull,
+    // which can be metres across for a part that is a few hundred mm.
+    double xMin = positions[0], yMin = positions[1], zMin = positions[2];
+    double xMax = xMin, yMax = yMin, zMax = zMin;
+    for (size_t i = 0; i + 2 < positions.size(); i += 3) {
+        xMin = std::min(xMin, static_cast<double>(positions[i]));
+        yMin = std::min(yMin, static_cast<double>(positions[i + 1]));
+        zMin = std::min(zMin, static_cast<double>(positions[i + 2]));
+        xMax = std::max(xMax, static_cast<double>(positions[i]));
+        yMax = std::max(yMax, static_cast<double>(positions[i + 1]));
+        zMax = std::max(zMax, static_cast<double>(positions[i + 2]));
+    }
 
     for (size_t i = 0; i + 2 < normals.size(); i += 3) {
         const float len = std::sqrt(normals[i] * normals[i] +
@@ -299,19 +317,7 @@ CADMesh *loadFromTriangulations(const NCollection_Sequence<Handle(Poly_Triangula
 
     if (positions.empty()) return makeError("File parsed, but contained no geometry.");
 
-    double xMin = positions[0], yMin = positions[1], zMin = positions[2];
-    double xMax = xMin, yMax = yMin, zMax = zMin;
-    for (size_t i = 0; i + 2 < positions.size(); i += 3) {
-        xMin = std::min(xMin, static_cast<double>(positions[i]));
-        yMin = std::min(yMin, static_cast<double>(positions[i + 1]));
-        zMin = std::min(zMin, static_cast<double>(positions[i + 2]));
-        xMax = std::max(xMax, static_cast<double>(positions[i]));
-        yMax = std::max(yMax, static_cast<double>(positions[i + 1]));
-        zMax = std::max(zMax, static_cast<double>(positions[i + 2]));
-    }
-
-    return finalizeMesh(positions, normals, buckets, faceCount,
-                        xMin, yMin, zMin, xMax, yMax, zMax);
+    return finalizeMesh(positions, normals, buckets, faceCount);
 }
 
 CADMesh *loadFromRawMesh(const RawMesh &raw) {
@@ -338,24 +344,13 @@ CADMesh *loadFromRawMesh(const RawMesh &raw) {
         }
     }
 
-    double xMin = positions[0], yMin = positions[1], zMin = positions[2];
-    double xMax = xMin, yMax = yMin, zMax = zMin;
-    for (size_t i = 0; i + 2 < positions.size(); i += 3) {
-        xMin = std::min(xMin, static_cast<double>(positions[i]));
-        yMin = std::min(yMin, static_cast<double>(positions[i + 1]));
-        zMin = std::min(zMin, static_cast<double>(positions[i + 2]));
-        xMax = std::max(xMax, static_cast<double>(positions[i]));
-        yMax = std::max(yMax, static_cast<double>(positions[i + 1]));
-        zMax = std::max(zMax, static_cast<double>(positions[i + 2]));
-    }
-
-    return finalizeMesh(positions, normals, buckets, 1,
-                        xMin, yMin, zMin, xMax, yMax, zMax);
+    return finalizeMesh(positions, normals, buckets, 1);
 }
 
 } // namespace
 
-extern "C" CADMesh *cadmesh_load(const char *path, double deflection) {
+extern "C" CADMesh *cadmesh_load(const char *path, double deflection,
+                                 cadmesh_progress_fn progress, void *context) {
     if (!path) return makeError("No file path given.");
 
     // OCCT is chatty on stdout by default; inside an app extension that is
@@ -370,10 +365,14 @@ extern "C" CADMesh *cadmesh_load(const char *path, double deflection) {
     std::string error;
 
     if (ext == "step" || ext == "stp" || ext == "p21" || ext == "iges" || ext == "igs") {
+        const bool iges = (ext == "iges" || ext == "igs");
+        reportProgress(progress, context, iges ? "Parsing IGES…" : "Parsing STEP…");
         if (!readWithColors(filePath, ext, shape, faceColors, error)) return makeError(error);
+        reportProgress(progress, context, "Tessellating…");
     } else if (ext == "stl") {
         // STL is already triangulated — read the mesh directly instead of
         // forcing it through the B-rep tessellator, which fails on some files.
+        reportProgress(progress, context, "Reading STL…");
         NCollection_Sequence<Handle(Poly_Triangulation)> tris;
         RWStl::ReadFile(filePath.c_str(), M_PI / 2.0, tris);
         if (tris.IsEmpty()) {
@@ -383,6 +382,7 @@ extern "C" CADMesh *cadmesh_load(const char *path, double deflection) {
         }
         return loadFromTriangulations(tris);
     } else if (ext == "3mf") {
+        reportProgress(progress, context, "Reading 3MF…");
         RawMesh raw;
         if (!read3mf(filePath, raw, error)) return makeError(error);
         return loadFromRawMesh(raw);
@@ -393,7 +393,13 @@ extern "C" CADMesh *cadmesh_load(const char *path, double deflection) {
     if (shape.IsNull()) return makeError("File parsed, but contained no geometry.");
 
     Bnd_Box box;
-    BRepBndLib::Add(shape, box);
+    // AddOptimal uses the trimmed face, not the underlying NURBS hull.
+    // Rhino STEP files often have surfaces whose untrimmed bounds are
+    // an order of magnitude larger than the part.
+    BRepBndLib::AddOptimal(shape, box);
+    if (box.IsVoid()) {
+        BRepBndLib::Add(shape, box);
+    }
     if (box.IsVoid()) return makeError("Model has no measurable extent.");
 
     double xMin, yMin, zMin, xMax, yMax, zMax;
@@ -478,8 +484,7 @@ extern "C" CADMesh *cadmesh_load(const char *path, double deflection) {
         }
     }
 
-    return finalizeMesh(positions, normals, buckets, faceCount,
-                        xMin, yMin, zMin, xMax, yMax, zMax);
+    return finalizeMesh(positions, normals, buckets, faceCount);
 }
 
 extern "C" void cadmesh_free(CADMesh *mesh) {

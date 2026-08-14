@@ -48,7 +48,7 @@ extension MeshData {
 // MARK: - Serialisation
 
 private let kMagic: UInt32 = 0x43414450   // "CADP"
-private let kVersion: UInt32 = 1
+private let kVersion: UInt32 = 2
 
 extension MeshData {
 

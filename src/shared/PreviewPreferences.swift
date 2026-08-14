@@ -81,6 +81,8 @@ enum PreviewPreferences {
 
     private static let fontSizeKey = "gcodeFontSize"
     private static let showModelColorsKey = "showModelColors"
+    private static let showEdgesKey = "showEdges"
+    private static let orthographicKey = "orthographic"
     private static let scrollUpZoomsInKey = "scrollUpZoomsIn"
     private static let upAxisKey = "upAxis"
     private static let zoomTargetKey = "zoomTarget"
@@ -100,6 +102,19 @@ enum PreviewPreferences {
     static var showModelColors: Bool {
         get { bool(showModelColorsKey, default: true) }
         set { queue.sync { update(showModelColorsKey, newValue) } }
+    }
+
+    /// Default for the **Edges** checkbox. On — shaded plus feature edges.
+    static var showEdges: Bool {
+        get { bool(showEdgesKey, default: true) }
+        set { queue.sync { update(showEdgesKey, newValue) } }
+    }
+
+    /// Default for the **Ortho** checkbox. Off — perspective, matching the
+    /// original camera.
+    static var orthographic: Bool {
+        get { bool(orthographicKey, default: false) }
+        set { queue.sync { update(orthographicKey, newValue) } }
     }
 
     /// Current behaviour: scroll / swipe up zooms in. Off inverts that.

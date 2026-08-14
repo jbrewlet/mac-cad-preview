@@ -63,22 +63,27 @@ so it skips steps 3 and 4 entirely.
 | Zoom | Scroll (toward the pointer by default; both that and the direction are in Settings) |
 | Pan | Two finger drag, or right button drag |
 
-Zoom moves the camera toward whatever is under the pointer rather than the
-centre of the window, and rotation re-anchors on the point you zoomed into, so
-you can dive into a specific feature and keep turning around it.
+The first view frames the whole model with a little space to the edge of the
+panel. Zoom moves the camera toward whatever is under the pointer rather than
+the centre of the window, and rotation re-anchors on the point you zoomed into,
+so you can dive into a specific feature and keep turning around it.
 
 Models are shown with Z pointing up, matching Fusion, SolidWorks and Inventor,
 rather than SceneKit's default of Y up. That, the starting camera and whether
 zoom follows the pointer are all in Settings.
 
 The bottom left corner shows the bounding box dimensions, the face count and the
-triangle count. When a model has more than one colour, a **Model colours**
-checkbox appears in the bottom right. Switch it off to see the whole part in a
-single neutral finish, which is often easier to read shape from. It is hidden
-for single colour models, where it would do nothing. Whether it starts checked
-is a setting; the default is on.
+triangle count. Click the dimensions to copy them. When a model has more than
+one colour, a **Model colours** checkbox appears in the bottom right. Switch it
+off to see the whole part in a single neutral finish, which is often easier to
+read shape from. It is hidden for single colour models, where it would do
+nothing. Whether it starts checked is a setting; the default is on.
 
-Every preview has a **Settings…** link. It opens the host app to the same
+**Edges** draws the sharp and boundary edges on top of the shaded model, the
+usual CAD inspection look. **Ortho** switches the camera to an orthographic
+projection. Both are settings; edges start on, perspective is the default.
+
+Every preview has a **Settings** link. It opens the host app to the same
 window as **Settings…** (⌘,) in Mac CAD Preview. Scroll up still zooms in
 unless you invert it.
 
@@ -89,11 +94,13 @@ preview.
 G-code (`.nc`, `.tap`) is shown as highlighted text rather than a 3D toolpath.
 G and M words, axis addresses, feed and speed, tools and comments are coloured
 so a program is readable at a glance. **A−** and **A+** in the corner change
-the font size; the choice is saved. The same setting is in **Settings…** when
+the font size; the choice is saved. The same setting is in **Settings** when
 you open Mac CAD Preview.
 
-The first preview of a large file can take a few seconds. Every preview of that
-same file afterwards is instant, because the result is cached.
+The first preview of a large file can take a few seconds. The panel says
+whether it is parsing or tessellating, and warns when the file is large enough
+that the wait is real. Every preview of that same file afterwards is instant,
+because the result is cached.
 
 ## Supported formats
 
@@ -301,7 +308,7 @@ The cache lives in the extension's sandbox container:
 Settings are a plist in the same container, under
 `Application Support/MacCADPreview/`. The host app is not sandboxed, so it
 writes that file directly. There is no Developer ID, which is why this is not
-an App Group. The preview **Settings…** link asks the unsandboxed XPC helper
+an App Group. The preview **Settings** link asks the unsandboxed XPC helper
 to open `maccadpreview://settings`.
 
 Entries are keyed on file path, size and modification time, so re-exporting a

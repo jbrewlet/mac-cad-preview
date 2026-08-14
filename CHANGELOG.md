@@ -17,7 +17,19 @@ and the patch version for everything else.
   host app **Settings** window, and is saved for the next spacebar.
 * Settings for 3D and G-code previews: model-colour default, zoom direction
   and target, up axis, initial view, G-code font size, line wrapping and
-  colour theme. A **Settings…** link on every preview opens the same window.
+  colour theme. A **Settings** link on every preview opens the same window.
+* **Edges** overlay on 3D previews (sharp and boundary edges on the shaded
+  model) and an **Ortho** camera toggle. Both are saved, and have defaults
+  in Settings.
+* Click the bounding-box dimensions to copy them.
+* The initial 3D camera frames the whole model with a light margin, instead
+  of sitting at a fixed multiple of the longest side.
+* Bounding box, dimensions and camera fit use the tessellated triangles
+  rather than the untrimmed NURBS hull, so Rhino STEP parts no longer
+  appear as a speck in a huge empty frame.
+* Load status names the stage — parsing, tessellating, or reading a mesh —
+  and warns that the first preview of a large STEP or IGES file can take a
+  while.
 
 ## [0.2.0] - 2026-08-13
 

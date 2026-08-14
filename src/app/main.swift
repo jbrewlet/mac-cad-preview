@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         body.maximumNumberOfLines = 0
 
         let settings = NSButton(
-            title: "Settings…",
+            title: "Settings",
             target: self,
             action: #selector(showSettings)
         )
