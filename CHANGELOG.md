@@ -9,15 +9,30 @@ and the patch version for everything else.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-13
+
+### Fixed
+
+* Previews for STEP and 3MF files on Macs with Shapr3D installed. Shapr3D
+  exports its own types for `.step` and `.3mf`, and whichever app owns a type
+  decides what a file is; Quick Look then matches that type exactly and does not
+  fall back to a parent type, so those files were never offered to the extension
+  and the spacebar did nothing at all. `com.shapr3d.step` and
+  `com.shapr3d.3d-manufacturing.3mf` are now handled.
+* Mac CAD Preview no longer makes itself the default application for `.3mf`. It
+  declared a document type it cannot open, so double clicking a 3MF opened a
+  window showing only the version number. A Quick Look extension needs the type
+  to exist, not a handler for it, so the declaration is gone.
+
 ### Added
 
 * `doctor.sh`, a read-only diagnostic for previews that do not appear. It checks
   the machine, the install location, quarantine, the signature, the extension's
   sandbox entitlement and registration, and how macOS classifies a given file,
-  then prints each problem with the command that fixes it. Quick Look routes on
-  content type rather than filename, so a file macOS classifies as another app's
-  type is never offered to the extension, which looks identical to the spacebar
-  doing nothing.
+  then prints each problem with the command that fixes it. It also lists every
+  app on the Mac that claims a CAD extension and flags any type the extension
+  does not handle, which is the only way to discover those identifiers: they
+  belong to other apps and cannot be known in advance.
 
 ### Changed
 
@@ -87,6 +102,7 @@ First release.
 * No Finder icon thumbnails. The preview only appears on spacebar.
 * No OBJ, PLY or 3MF support.
 
-[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.2.1
 [0.2.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.1.0

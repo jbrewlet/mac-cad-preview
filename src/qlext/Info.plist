@@ -32,6 +32,10 @@
 				<string>com.maccadpreview.iges</string>
 				<string>com.maccadpreview.3mf</string>
 				<string>com.belighten.modelshow.3dfiles</string>
+				<!-- Shapr3D owns .step and .3mf wherever it is installed, so
+				     those files arrive as its types rather than ours. -->
+				<string>com.shapr3d.step</string>
+				<string>com.shapr3d.3d-manufacturing.3mf</string>
 				<string>public.3d-content</string>
 				<!-- STL included as a control: it uses a system UTI, so if STEP
 				     fails but this works, the problem is our UTI declaration. -->

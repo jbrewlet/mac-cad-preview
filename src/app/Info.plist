@@ -25,25 +25,10 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 
-	<key>CFBundleDocumentTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeExtensions</key>
-			<array>
-				<string>3mf</string>
-			</array>
-			<key>CFBundleTypeName</key>
-			<string>3MF Model</string>
-			<key>CFBundleTypeRole</key>
-			<string>Viewer</string>
-			<key>LSHandlerRank</key>
-			<string>Owner</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>com.maccadpreview.3mf</string>
-			</array>
-		</dict>
-	</array>
+	<!-- Deliberately no CFBundleDocumentTypes. Declaring one would make this app
+	     the default opener for those files, and it cannot open anything: it
+	     exists only so macOS can find the Quick Look extension. Previews need
+	     the types below to exist, not a handler for them. -->
 
 	<!-- macOS ships no UTI for STEP or IGES, so we declare them. STL, OBJ and
 	     PLY already have system UTIs and must NOT be redeclared here. -->
@@ -109,13 +94,54 @@
 		</dict>
 	</array>
 
-	<!-- Other apps (e.g. BeLighten ModelShow) claim their own 3MF UTIs; import
-	     them so Quick Look can still route .3mf files to our extension. -->
+	<!-- Other CAD apps export their own UTIs for these extensions, and whichever
+	     app Launch Services picks as the owner decides what a file "is". Quick
+	     Look routes on that, so a file owned by another app's UTI is never
+	     offered to our extension at all — the spacebar just does nothing.
+	     Importing their types lets us handle those files too. Importing does not
+	     claim to open anything; it only says the type is known here. -->
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
 			<string>com.belighten.modelshow.3dfiles</string>
+			<key>UTTypeDescription</key>
+			<string>3D Manufacturing Format</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.3d-content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>3mf</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.shapr3d.step</string>
+			<key>UTTypeDescription</key>
+			<string>STEP CAD Model</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.3d-content</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>step</string>
+					<string>stp</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.shapr3d.3d-manufacturing.3mf</string>
 			<key>UTTypeDescription</key>
 			<string>3D Manufacturing Format</string>
 			<key>UTTypeConformsTo</key>

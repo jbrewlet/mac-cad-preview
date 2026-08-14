@@ -242,6 +242,68 @@ read_supported_types() {
     done
 }
 
+# ------------------------------------------------------- who claims the types
+
+# Quick Look matches the file's exact type and does not fall back to a parent
+# type, so every app that declares its own type for a CAD extension has to be
+# listed by name in the extension. This reports all of them on this Mac, which
+# is what makes an unhandled one a two line fix rather than a guessing game.
+report_type_claimants() {
+    say "Apps claiming these file types"
+    note "(reading the Launch Services database, this takes a few seconds)"
+
+    local lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    [ -x "$lsregister" ] || { bad "lsregister is not where it should be"; return; }
+
+    local claims unhandled=0
+    claims="$("$lsregister" -dump 2>/dev/null | awk -v exts="$SUPPORTED_EXTENSIONS" '
+        BEGIN { count = split(exts, wanted, " ") }
+        function flush() {
+            if (uti != "" && tags != "") {
+                # Match ".step," rather than ".step" so .stp does not also
+                # match .stpz.
+                list = tags ","
+                for (i = 1; i <= count; i++) {
+                    if (index(list, "." wanted[i] ",") > 0) {
+                        printf "%-8s %-42s %s\n", "." wanted[i], uti, bundle
+                    }
+                }
+            }
+            uti = ""; tags = ""; bundle = ""
+        }
+        /^-+$/    { flush(); next }
+        # The dump carries a record id on the bundle name, and the same app can
+        # appear several times, so drop it and let sort -u collapse them.
+        /^bundle:/ { sub(/^bundle:[ \t]*/, ""); sub(/ \(0x[0-9a-f]+\)$/, ""); bundle = $0; next }
+        /^uti:/    { sub(/^uti:[ \t]*/, ""); uti = $0; next }
+        /^tags:/   { sub(/^tags:[ \t]*/, ""); tags = $0; next }
+        END { flush() }
+    ' | sort -u)"
+
+    if [ -z "$claims" ]; then
+        note "none found"
+        return
+    fi
+
+    local extension uti owner
+    while read -r extension uti owner; do
+        [ -n "$uti" ] || continue
+        if printf '%s\n' "${QL_TYPES[@]}" | grep -qxF "$uti"; then
+            printf '  \033[1;32m✓\033[0m %-8s %-42s %s\n' "$extension" "$uti" "$owner"
+        else
+            printf '  \033[1;31m✗\033[0m %-8s %-42s %s  <- NOT HANDLED\n' \
+                "$extension" "$uti" "$owner"
+            unhandled=$((unhandled + 1))
+        fi
+    done <<< "$claims"
+
+    if [ "$unhandled" -gt 0 ]; then
+        problem "$unhandled file type(s) above are claimed by other apps and this extension does not handle them." \
+            "Those exact identifiers have to be added to the extension. Please paste the
+  lines marked NOT HANDLED at https://github.com/jbrewlet/mac-cad-preview/issues"
+    fi
+}
+
 # ------------------------------------------------------------------- a file
 
 # Quick Look routes on the file's content type, not its name. If macOS resolved
@@ -406,6 +468,7 @@ main() {
     check_quarantine
     check_registration
     read_supported_types
+    report_type_claimants
 
     if [ $# -gt 0 ]; then
         local file
