@@ -31,6 +31,7 @@
 				<string>com.maccadpreview.step</string>
 				<string>com.maccadpreview.iges</string>
 				<string>com.maccadpreview.3mf</string>
+				<string>com.maccadpreview.gcode</string>
 				<string>com.belighten.modelshow.3dfiles</string>
 				<string>public.3d-content</string>
 				<!-- STL included as a control: it uses a system UTI, so if STEP

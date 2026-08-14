@@ -9,6 +9,16 @@ and the patch version for everything else.
 
 ## [Unreleased]
 
+### Added
+
+* Quick Look preview for G-code (`.nc`, `.tap`) with syntax colouring for
+  G/M words, axis addresses, feed/speed, tools, line numbers and comments.
+* G-code font size can be changed in the preview (**A−** / **A+**) or in the
+  host app **Settings** window, and is saved for the next spacebar.
+* Settings for 3D and G-code previews: model-colour default, zoom direction
+  and target, up axis, initial view, G-code font size, line wrapping and
+  colour theme. A **Settings…** link on every preview opens the same window.
+
 ## [0.2.0] - 2026-08-13
 
 ### Added

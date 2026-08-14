@@ -44,9 +44,10 @@ version is never edited anywhere else.
    Each should report the same 40.0 × 24.0 × 26.0 bounding box. The STEP and
    IGES fixtures carry two colours; the STL one, which cannot carry colour, one.
 
-5. Preview each of `tests/spike.step`, `tests/spike.iges` and `tests/spike.stl`
-   from the Finder with the built app installed. Step 4 does not cover Quick
-   Look itself — the extension registering, the panel appearing within the
+5. Preview each of `tests/spike.step`, `tests/spike.iges`, `tests/spike.stl`
+   `tests/spike.nc` and `tests/spike.tap` from the Finder with the built app
+   installed. The G-code fixtures should show highlighted text, not a 3D view. Step 4 does not cover
+   Quick Look itself — the extension registering, the panel appearing within the
    response timeout, and the controls responding. There is no automated test
    suite, so these two steps together are the gate.
 

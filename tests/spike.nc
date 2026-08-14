@@ -1,0 +1,23 @@
+%
+O1001 (SPIKE PLATE)
+(40 x 24 x 8 mm plate, 12 mm bore)
+G90 G94 G17 G21
+G54
+T1 M6
+S12000 M3
+G0 X0 Y0
+G0 Z5.0
+G1 Z-1.0 F200
+G1 X40.0 F800
+G1 Y24.0
+G1 X0
+G1 Y0
+G0 Z5.0
+; bore at plate centre
+G0 X20.0 Y12.0
+G1 Z-8.0 F150
+G0 Z5.0
+M5
+G0 Z25.0
+M30
+%

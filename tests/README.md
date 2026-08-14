@@ -18,3 +18,12 @@ fails visibly rather than subtly.
 `make_fixtures.cpp` regenerates all three; the compile line is in its header
 comment. The output is committed, so it only needs running when the geometry
 being covered changes.
+
+| File | Covers |
+| --- | --- |
+| `spike.nc` | G-code text preview: comments, G/M words, axes, feed, speed, tool |
+| `spike.tap` | Same program, other claimed extension |
+
+The fixture is the same plate described as a short milling program, so the
+highlighted preview has something recognisable to read. It is not fed to
+`cadprobe`.

@@ -25,6 +25,18 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.maccadpreview.settings</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>maccadpreview</string>
+			</array>
+		</dict>
+	</array>
+
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -104,6 +116,25 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>3mf</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.maccadpreview.gcode</string>
+			<key>UTTypeDescription</key>
+			<string>G-code</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.plain-text</string>
+				<string>public.source-code</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>nc</string>
+					<string>tap</string>
 				</array>
 			</dict>
 		</dict>

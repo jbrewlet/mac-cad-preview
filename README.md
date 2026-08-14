@@ -37,7 +37,7 @@ else to install.
 5. The app opens and shows its version. Quit it. That launch is all macOS needed;
    previews work whether or not the app is running.
 
-6. Select a `.step`, `.iges`, `.stl` or `.3mf` file in the Finder and press the spacebar.
+6. Select a `.step`, `.iges`, `.stl`, `.3mf`, `.nc` or `.tap` file in the Finder and press the spacebar.
 
 ### Why macOS blocks it, and why step 4 matters
 
@@ -60,7 +60,7 @@ so it skips steps 3 and 4 entirely.
 | Action | Gesture |
 |:-------|:--------|
 | Orbit | Drag |
-| Zoom | Scroll (zooms toward the pointer) |
+| Zoom | Scroll (toward the pointer by default; both that and the direction are in Settings) |
 | Pan | Two finger drag, or right button drag |
 
 Zoom moves the camera toward whatever is under the pointer rather than the
@@ -68,17 +68,29 @@ centre of the window, and rotation re-anchors on the point you zoomed into, so
 you can dive into a specific feature and keep turning around it.
 
 Models are shown with Z pointing up, matching Fusion, SolidWorks and Inventor,
-rather than SceneKit's default of Y up.
+rather than SceneKit's default of Y up. That, the starting camera and whether
+zoom follows the pointer are all in Settings.
 
 The bottom left corner shows the bounding box dimensions, the face count and the
 triangle count. When a model has more than one colour, a **Model colours**
 checkbox appears in the bottom right. Switch it off to see the whole part in a
 single neutral finish, which is often easier to read shape from. It is hidden
-for single colour models, where it would do nothing.
+for single colour models, where it would do nothing. Whether it starts checked
+is a setting; the default is on.
+
+Every preview has a **Settings…** link. It opens the host app to the same
+window as **Settings…** (⌘,) in Mac CAD Preview. Scroll up still zooms in
+unless you invert it.
 
 On STEP and IGES files, a **Fusion** button appears top-right when Autodesk
 Fusion is installed. Click it to open the file in Fusion without leaving the
 preview.
+
+G-code (`.nc`, `.tap`) is shown as highlighted text rather than a 3D toolpath.
+G and M words, axis addresses, feed and speed, tools and comments are coloured
+so a program is readable at a glance. **A−** and **A+** in the corner change
+the font size; the choice is saved. The same setting is in **Settings…** when
+you open Mac CAD Preview.
 
 The first preview of a large file can take a few seconds. Every preview of that
 same file afterwards is instant, because the result is cached.
@@ -91,6 +103,7 @@ same file afterwards is instant, because the result is cached.
 | IGES | `.iges`, `.igs` | yes |
 | STL | `.stl` | no (the format has none) |
 | 3MF | `.3mf` | no (basic mesh support) |
+| G-code | `.nc`, `.tap` | syntax highlighting (text, not a mesh) |
 
 Model colours are read from the file where the exporter wrote them. Not every
 exporter writes them, so a part with no colour data falls back to neutral grey.
@@ -168,6 +181,7 @@ behaves strangely.
 * No Finder icon thumbnails yet. Files still show a generic icon in icon view;
   the preview only appears on spacebar.
 * No OBJ or PLY support yet.
+* G-code is a highlighted text preview, not a 3D toolpath.
 * Apple Silicon only. Intel is not supported.
 
 ## Support
@@ -284,6 +298,12 @@ The cache lives in the extension's sandbox container:
 ~/Library/Containers/com.maccadpreview.quicklook/Data/Library/Caches/MacCADPreview/
 ```
 
+Settings are a plist in the same container, under
+`Application Support/MacCADPreview/`. The host app is not sandboxed, so it
+writes that file directly. There is no Developer ID, which is why this is not
+an App Group. The preview **Settings…** link asks the unsandboxed XPC helper
+to open `maccadpreview://settings`.
+
 Entries are keyed on file path, size and modification time, so re-exporting a
 part from your CAD tool invalidates the old entry automatically. The cache is
 capped at 512 MB and evicts the least recently used entries first. To clear it:
@@ -314,6 +334,10 @@ needs into the bundle and rewrites the load commands to point inside it. That is
 Quick Look also kills extensions that take too long to respond, which a 19 second
 parse would trip. So the panel is put on screen and reported ready immediately,
 and the geometry is filled in from a background queue when it is available.
+
+G-code files skip the geometry core. The extension reads the text, colours
+word-address codes and comments, and shows that in a scrollable view. Files
+larger than 1 MB are truncated so a long CAM program cannot stall the panel.
 
 ## Licence
 

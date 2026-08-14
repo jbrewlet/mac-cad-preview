@@ -68,7 +68,9 @@ swiftc -O \
     -module-name MacCADPreview \
     -framework Cocoa \
     -o "$APP/Contents/MacOS/MacCADPreview" \
-    "$ROOT/src/app/main.swift"
+    "$ROOT/src/app/main.swift" \
+    "$ROOT/src/app/SettingsWindow.swift" \
+    "$ROOT/src/shared/PreviewPreferences.swift"
 cp "$ROOT/src/app/Info.plist" "$APP/Contents/Info.plist"
 stamp_version "$APP/Contents/Info.plist"
 
@@ -85,7 +87,8 @@ swiftc -O \
     -o "$XPC/Contents/MacOS/MacCADPreviewHelper" \
     "$ROOT/src/xpc/main.swift" \
     "$ROOT/src/qlext/FusionOpener.swift" \
-    "$ROOT/src/shared/FusionXPC.swift"
+    "$ROOT/src/shared/FusionXPC.swift" \
+    "$ROOT/src/shared/HostApp.swift"
 cp "$ROOT/src/xpc/Info.plist" "$XPC/Contents/Info.plist"
 
 # ----------------------------------------------------------- ql extension
@@ -104,9 +107,12 @@ swiftc -O \
     -Xlinker -e -Xlinker _NSExtensionMain \
     -o "$APPEX/Contents/MacOS/MacCADPreviewQL" \
     "$ROOT/src/qlext/PreviewViewController.swift" \
+    "$ROOT/src/qlext/GCodeHighlighter.swift" \
+    "$ROOT/src/shared/PreviewPreferences.swift" \
     "$ROOT/src/qlext/MeshData.swift" \
     "$ROOT/src/qlext/FusionOpener.swift" \
     "$ROOT/src/shared/FusionXPC.swift" \
+    "$ROOT/src/shared/HostApp.swift" \
     "$ROOT/src/qlext/FusionOpenButton.swift"
 cp "$ROOT/src/qlext/Info.plist" "$APPEX/Contents/Info.plist"
 stamp_version "$APPEX/Contents/Info.plist"

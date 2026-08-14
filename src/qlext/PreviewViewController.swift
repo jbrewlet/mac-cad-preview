@@ -15,11 +15,18 @@ struct MeshLoadError: Error {
 final class PreviewViewController: NSViewController, QLPreviewingController {
 
     private var sceneView: CADSceneView!
+    private var textScrollView: NSScrollView!
+    private var textView: NSTextView!
     private var infoLabel: NSTextField!
     private var statusLabel: NSTextField!
     private var spinner: NSProgressIndicator!
     private var colorToggle: NSButton!
+    private var fontSizeBox: NSStackView!
+    private var fontSizeLabel: NSTextField!
+    private var smallerFontButton: NSButton!
+    private var largerFontButton: NSButton!
     private var openInFusionButton: FusionOpenButton!
+    private var settingsLink: NSButton!
 
     private var previewURL: URL?
 
@@ -42,6 +49,35 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         sceneView.backgroundColor = .clear
         sceneView.rendersContinuously = false
         root.addSubview(sceneView)
+
+        textView = NSTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = true
+        textView.drawsBackground = true
+        textView.backgroundColor = .textBackgroundColor
+        textView.textContainerInset = NSSize(width: 16, height: 14)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.containerSize = NSSize(width: root.bounds.width, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+
+        textScrollView = NSScrollView(frame: root.bounds)
+        textScrollView.autoresizingMask = [.width, .height]
+        textScrollView.hasVerticalScroller = true
+        textScrollView.hasHorizontalScroller = false
+        textScrollView.autohidesScrollers = true
+        textScrollView.borderType = .noBorder
+        textScrollView.drawsBackground = true
+        textScrollView.backgroundColor = .textBackgroundColor
+        textScrollView.documentView = textView
+        textScrollView.automaticallyAdjustsContentInsets = false
+        textScrollView.contentInsets = NSEdgeInsets(top: 28, left: 0, bottom: 28, right: 0)
+        textScrollView.isHidden = true
+        root.addSubview(textScrollView)
 
         // Model dimensions etc., bottom-left.
         infoLabel = NSTextField(labelWithString: "")
@@ -74,23 +110,63 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                                target: self,
                                action: #selector(toggleColors(_:)))
         colorToggle.translatesAutoresizingMaskIntoConstraints = false
-        colorToggle.state = .on
+        colorToggle.state = PreviewPreferences.showModelColors ? .on : .off
         colorToggle.controlSize = .small
         colorToggle.font = .systemFont(ofSize: 11)
         colorToggle.isHidden = true
         root.addSubview(colorToggle)
+
+        smallerFontButton = NSButton(title: "A−", target: self, action: #selector(smallerGCodeFont))
+        smallerFontButton.bezelStyle = .roundRect
+        smallerFontButton.controlSize = .small
+        smallerFontButton.font = .systemFont(ofSize: 11)
+        smallerFontButton.toolTip = "Smaller G-code text"
+
+        largerFontButton = NSButton(title: "A+", target: self, action: #selector(largerGCodeFont))
+        largerFontButton.bezelStyle = .roundRect
+        largerFontButton.controlSize = .small
+        largerFontButton.font = .systemFont(ofSize: 11)
+        largerFontButton.toolTip = "Larger G-code text"
+
+        fontSizeLabel = NSTextField(labelWithString: "")
+        fontSizeLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        fontSizeLabel.textColor = .secondaryLabelColor
+        fontSizeLabel.setContentHuggingPriority(.required, for: .horizontal)
+
+        fontSizeBox = NSStackView(views: [smallerFontButton, fontSizeLabel, largerFontButton])
+        fontSizeBox.orientation = .horizontal
+        fontSizeBox.alignment = .centerY
+        fontSizeBox.spacing = 6
+        fontSizeBox.translatesAutoresizingMaskIntoConstraints = false
+        fontSizeBox.isHidden = true
+        root.addSubview(fontSizeBox)
 
         openInFusionButton = FusionOpenButton()
         openInFusionButton.isHidden = true
         openInFusionButton.onClick = { [weak self] in self?.openInFusion() }
         root.addSubview(openInFusionButton, positioned: .above, relativeTo: sceneView)
 
+        settingsLink = NSButton(title: "Settings…", target: self, action: #selector(openSettings))
+        settingsLink.bezelStyle = .inline
+        settingsLink.isBordered = false
+        settingsLink.font = .systemFont(ofSize: 11)
+        settingsLink.contentTintColor = .secondaryLabelColor
+        settingsLink.translatesAutoresizingMaskIntoConstraints = false
+        settingsLink.toolTip = "Open Mac CAD Preview settings"
+        root.addSubview(settingsLink)
+
         NSLayoutConstraint.activate([
+            settingsLink.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 10),
+            settingsLink.topAnchor.constraint(equalTo: root.topAnchor, constant: 8),
+
             openInFusionButton.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
             openInFusionButton.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
 
             colorToggle.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
             colorToggle.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
+
+            fontSizeBox.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
+            fontSizeBox.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
 
             infoLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
             infoLabel.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12),
@@ -112,6 +188,11 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         preferredContentSize = NSSize(width: 1000, height: 750)
     }
 
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        applyGCodeWrapping(to: textScrollView.contentView.bounds.width)
+    }
+
     // MARK: - QLPreviewingController
 
     func preparePreviewOfFile(at url: URL, completionHandler handler: @escaping (Error?) -> Void) {
@@ -126,6 +207,22 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             self.statusLabel.stringValue = "Reading \(url.lastPathComponent)…"
             self.spinner.startAnimation(nil)
             handler(nil)
+        }
+
+        if GCodePreview.isGCode(url) {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let started = CFAbsoluteTimeGetCurrent()
+                switch GCodePreview.load(from: url) {
+                case .failure(let error):
+                    DispatchQueue.main.async { self?.showFailure(error.message) }
+                case .success(let document):
+                    let elapsed = CFAbsoluteTimeGetCurrent() - started
+                    DispatchQueue.main.async {
+                        self?.presentGCode(document.text, info: document.info, elapsed: elapsed)
+                    }
+                }
+            }
+            return
         }
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -178,6 +275,28 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         spinner.stopAnimation(nil)
         statusLabel.stringValue = message
         sceneView.isHidden = true
+        textScrollView.isHidden = true
+        fontSizeBox.isHidden = true
+    }
+
+    private func presentGCode(_ text: NSAttributedString, info: String, elapsed: Double) {
+        spinner.stopAnimation(nil)
+        statusLabel.stringValue = ""
+        sceneView.isHidden = true
+        colorToggle.isHidden = true
+        openInFusionButton.isHidden = true
+
+        textView.textStorage?.setAttributedString(text)
+        applyGCodeWrapping(to: textScrollView.contentView.bounds.width)
+        textView.scrollToBeginningOfDocument(nil)
+        textScrollView.isHidden = false
+        refreshFontSizeControls()
+        fontSizeBox.isHidden = false
+
+        infoLabel.stringValue = info
+        infoLabel.isHidden = false
+
+        qlLog.info("gcode highlighted in \(elapsed, format: .fixed(precision: 2))s")
     }
 
     private func present(geometry: SCNGeometry,
@@ -188,12 +307,19 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                          cached: Bool) {
         spinner.stopAnimation(nil)
         statusLabel.stringValue = ""
+        textScrollView.isHidden = true
+        fontSizeBox.isHidden = true
+        sceneView.isHidden = false
 
         geometryMaterials = geometry.materials
         originalColors = colors
         // With a single colour there is nothing to switch between, so the
         // toggle would just be clutter.
         colorToggle.isHidden = (colors.count < 2)
+        if colors.count >= 2 {
+            colorToggle.state = PreviewPreferences.showModelColors ? .on : .off
+            applyModelColors(colorToggle.state == .on)
+        }
 
         let scene = SCNScene()
 
@@ -205,16 +331,19 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
                                                CGFloat(centre.y),
                                                CGFloat(centre.z))
 
-        // CAD tools (Fusion, SolidWorks, Inventor) treat +Z as up; SceneKit
-        // treats +Y as up. Rotating -90° about X maps model Z onto scene Y, so
-        // parts stand the way they were drawn instead of lying on their back.
-        let zUp = SCNNode()
-        zUp.eulerAngles.x = -.pi / 2
-        zUp.addChildNode(node)
-        scene.rootNode.addChildNode(zUp)
+        // CAD tools treat +Z as up; SceneKit treats +Y as up. The default
+        // maps model Z onto scene Y. Y-up skips that, for SceneKit-style files.
+        let oriented = SCNNode()
+        if PreviewPreferences.upAxis == .zUp {
+            oriented.eulerAngles.x = -.pi / 2
+        }
+        oriented.addChildNode(node)
+        scene.rootNode.addChildNode(oriented)
 
         let extent = bounds.max - bounds.min
         let radius = max(max(extent.x, extent.y), extent.z)
+        let d = radius * 1.9
+        let cameraPosition = Self.cameraPosition(radius: radius)
 
         let camera = SCNCamera()
         camera.zNear = Double(radius) * 0.001
@@ -222,10 +351,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         camera.wantsHDR = false
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        // Isometric three-quarter view — front, right and above — which is the
-        // convention for presenting a part.
-        let d = radius * 1.9
-        cameraNode.position = SCNVector3(CGFloat(d), CGFloat(d * 0.9), CGFloat(d))
+        cameraNode.position = cameraPosition
         cameraNode.look(at: SCNVector3Zero)
         scene.rootNode.addChildNode(cameraNode)
 
@@ -234,7 +360,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         key.intensity = 700
         let keyNode = SCNNode()
         keyNode.light = key
-        keyNode.position = SCNVector3(CGFloat(d), CGFloat(d * 1.5), CGFloat(d))
+        keyNode.position = SCNVector3(cameraPosition.x,
+                                      cameraPosition.y + CGFloat(d * 0.4),
+                                      cameraPosition.z)
         keyNode.look(at: SCNVector3Zero)
         scene.rootNode.addChildNode(keyNode)
 
@@ -329,17 +457,83 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         return (geometry, colors)
     }
 
-    // MARK: - Open in Fusion
+    private static func cameraPosition(radius: Float) -> SCNVector3 {
+        let d = CGFloat(radius * 1.9)
+        switch PreviewPreferences.initialView {
+        case .isometric:
+            return SCNVector3(d, d * 0.9, d)
+        case .front:
+            return SCNVector3(0, CGFloat(radius) * 0.15, d)
+        case .top:
+            return SCNVector3(0, d, 0.001)
+        }
+    }
+
+    // MARK: - Open in Fusion / Settings
 
     private func openInFusion() {
         guard let url = previewURL else { return }
         FusionOpener.requestOpen(url)
     }
 
+    @objc private func openSettings() {
+        HostApp.requestOpenSettings()
+    }
+
+    private func applyGCodeWrapping(to width: CGFloat) {
+        guard width > 0 else { return }
+        let wrap = PreviewPreferences.gcodeWrapping == .wrap
+        textView.isHorizontallyResizable = !wrap
+        textView.textContainer?.widthTracksTextView = wrap
+        textScrollView.hasHorizontalScroller = !wrap
+        if wrap {
+            textView.frame.size.width = width
+            textView.textContainer?.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        } else {
+            textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude,
+                                                           height: CGFloat.greatestFiniteMagnitude)
+        }
+    }
+
     // MARK: - Colour toggle
+
+    // MARK: - G-code font size
+
+    @objc private func smallerGCodeFont() {
+        changeGCodeFontSize(by: -1)
+    }
+
+    @objc private func largerGCodeFont() {
+        changeGCodeFontSize(by: 1)
+    }
+
+    private func changeGCodeFontSize(by delta: CGFloat) {
+        let next = PreviewPreferences.clamped(PreviewPreferences.gcodeFontSize + delta)
+        PreviewPreferences.gcodeFontSize = next
+        applyGCodeFontSize(next)
+        refreshFontSizeControls()
+    }
+
+    private func applyGCodeFontSize(_ size: CGFloat) {
+        guard let storage = textView.textStorage, storage.length > 0 else { return }
+        storage.addAttribute(.font, value: GCodeHighlighter.font(size: size),
+                             range: NSRange(location: 0, length: storage.length))
+    }
+
+    private func refreshFontSizeControls() {
+        let size = PreviewPreferences.gcodeFontSize
+        fontSizeLabel.stringValue = "\(Int(size)) pt"
+        smallerFontButton.isEnabled = size > PreviewPreferences.minimumFontSize
+        largerFontButton.isEnabled = size < PreviewPreferences.maximumFontSize
+    }
 
     @objc private func toggleColors(_ sender: NSButton) {
         let showOriginal = (sender.state == .on)
+        PreviewPreferences.showModelColors = showOriginal
+        applyModelColors(showOriginal)
+    }
+
+    private func applyModelColors(_ showOriginal: Bool) {
         for (index, material) in geometryMaterials.enumerated() {
             material.diffuse.contents = showOriginal
                 ? originalColors[index]
@@ -367,20 +561,26 @@ final class CADSceneView: SCNView {
         // notches. Normalise so both feel the same.
         var delta = event.scrollingDeltaY
         if !event.hasPreciseScrollingDeltas { delta *= 8 }
+        if !PreviewPreferences.scrollUpZoomsIn { delta = -delta }
         guard delta != 0 else { return }
 
-        // Scroll up / swipe up = zoom in.
+        // Default: scroll up / swipe up = zoom in. Invertible in Settings.
         let step = min(abs(delta) * 0.004, 0.3)
         let fraction = delta > 0 ? step : -step
 
-        // Zoom toward the point under the pointer. If the pointer is over empty
-        // space there is nothing to converge on, so fall back to the model.
-        let point = convert(event.locationInWindow, from: nil)
-        let hits = hitTest(point, options: [
-            .searchMode: SCNHitTestSearchMode.closest.rawValue,
-            .ignoreHiddenNodes: true,
-        ])
-        let target = hits.first?.worldCoordinates ?? orbitTarget
+        // Default: zoom toward the point under the pointer. Settings can
+        // switch that to the window centre (the model orbit target).
+        let target: SCNVector3
+        if PreviewPreferences.zoomTarget == .pointer {
+            let point = convert(event.locationInWindow, from: nil)
+            let hits = hitTest(point, options: [
+                .searchMode: SCNHitTestSearchMode.closest.rawValue,
+                .ignoreHiddenNodes: true,
+            ])
+            target = hits.first?.worldCoordinates ?? orbitTarget
+        } else {
+            target = orbitTarget
+        }
 
         let position = pov.worldPosition
         let toTarget = SCNVector3(target.x - position.x,

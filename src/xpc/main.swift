@@ -7,6 +7,10 @@ final class OpenInFusionXPCService: NSObject, OpenInFusionXPCProtocol, NSXPCList
         FusionOpener.openInFusion(path: path, reply: reply)
     }
 
+    func openSettings(reply: @escaping (Bool) -> Void) {
+        HostApp.openSettings(reply: reply)
+    }
+
     func listener(_ listener: NSXPCListener,
                   shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
         newConnection.exportedInterface = NSXPCInterface(with: OpenInFusionXPCProtocol.self)
