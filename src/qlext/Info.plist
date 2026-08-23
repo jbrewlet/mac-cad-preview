@@ -33,6 +33,12 @@
 				<string>com.maccadpreview.3mf</string>
 				<string>com.maccadpreview.gcode</string>
 				<string>net.daringfireball.markdown</string>
+				<string>public.zip-archive</string>
+				<string>com.pkware.zip-archive</string>
+				<string>com.maccadpreview.rar</string>
+				<string>com.rarlab.rar-archive</string>
+				<string>com.maccadpreview.7z</string>
+				<string>org.7-zip.7-zip-archive</string>
 				<string>com.belighten.modelshow.3dfiles</string>
 				<!-- Shapr3D owns .step and .3mf wherever it is installed, so
 				     those files arrive as its types rather than ours. -->

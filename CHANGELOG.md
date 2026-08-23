@@ -15,6 +15,9 @@ and the patch version for everything else.
   the rendered document or the original source; a **Rendered / Source**
   control in the preview switches between them. The default is a setting,
   and starts as rendered.
+* Quick Look preview for zip, RAR and 7z archives. The panel lists folders,
+  file names and uncompressed sizes without extracting anything. Font size
+  is a setting, and **A−** / **A+** on the panel change it.
 
 ## [0.3.0] - 2026-08-13
 

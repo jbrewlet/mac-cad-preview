@@ -210,7 +210,7 @@ main() {
 
     printf '\n'
     say "Done"
-    printf 'Select a STEP, IGES, STL, 3MF, NC or TAP file in the Finder and press the spacebar.\n'
+    printf 'Select a STEP, IGES, STL, 3MF, NC, TAP, Markdown, ZIP, RAR or 7z file in the Finder and press the spacebar.\n'
 }
 
 main "$@"

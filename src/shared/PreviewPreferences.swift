@@ -103,6 +103,7 @@ enum PreviewPreferences {
     private static let gcodeThemeKey = "gcodeTheme"
     private static let markdownViewModeKey = "markdownViewMode"
     private static let markdownFontSizeKey = "markdownFontSize"
+    private static let archiveFontSizeKey = "archiveFontSize"
     private static let containerBundleID = "com.maccadpreview.quicklook"
     private static let queue = DispatchQueue(label: "com.maccadpreview.preferences")
     private static var cached: [String: Any]?
@@ -171,6 +172,11 @@ enum PreviewPreferences {
     static var markdownFontSize: CGFloat {
         get { queue.sync { clamped(read()[markdownFontSizeKey] as? Double) } }
         set { queue.sync { update(markdownFontSizeKey, Double(clamped(newValue))) } }
+    }
+
+    static var archiveFontSize: CGFloat {
+        get { queue.sync { clamped(read()[archiveFontSizeKey] as? Double) } }
+        set { queue.sync { update(archiveFontSizeKey, Double(clamped(newValue))) } }
     }
 
     static func clamped(_ size: CGFloat) -> CGFloat {

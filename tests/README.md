@@ -25,8 +25,12 @@ being covered changes.
 | `spike.nc` | G-code text preview: comments, G/M words, axes, feed, speed, tool |
 | `spike.tap` | Same program, other claimed extension |
 | `spike.md` | Markdown preview: headings, emphasis, lists, a code block, a quote |
+| `spike.zip` | Zip listing: two folders and a readme, same plate notes |
+| `spike.rar` | RAR listing of the same tree |
+| `spike.7z` | 7z listing of the same tree |
 
 The G-code fixture is the same plate described as a short milling program, so the
 highlighted preview has something recognisable to read. It is not fed to
 `cadprobe`. The Markdown fixture covers the same part in prose, for the
-rendered / source toggle.
+rendered / source toggle. The archive fixtures pack that same readme so
+spacebar shows a short folder tree rather than a 3D view.

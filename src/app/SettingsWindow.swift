@@ -23,6 +23,8 @@ final class SettingsWindow: NSWindow {
     private let stepper = NSStepper()
     private let markdownSizeLabel = NSTextField(labelWithString: "")
     private let markdownStepper = NSStepper()
+    private let archiveSizeLabel = NSTextField(labelWithString: "")
+    private let archiveStepper = NSStepper()
 
     init() {
         super.init(
@@ -60,9 +62,12 @@ final class SettingsWindow: NSWindow {
         sizeLabel.setContentHuggingPriority(.required, for: .horizontal)
         markdownSizeLabel.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         markdownSizeLabel.setContentHuggingPriority(.required, for: .horizontal)
+        archiveSizeLabel.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        archiveSizeLabel.setContentHuggingPriority(.required, for: .horizontal)
 
         configureFontStepper(stepper, action: #selector(stepperChanged))
         configureFontStepper(markdownStepper, action: #selector(markdownStepperChanged))
+        configureFontStepper(archiveStepper, action: #selector(archiveStepperChanged))
 
         let fontRow = NSStackView(views: [sizeLabel, stepper])
         fontRow.orientation = .horizontal
@@ -72,6 +77,10 @@ final class SettingsWindow: NSWindow {
         markdownFontRow.orientation = .horizontal
         markdownFontRow.alignment = .centerY
         markdownFontRow.spacing = 8
+        let archiveFontRow = NSStackView(views: [archiveSizeLabel, archiveStepper])
+        archiveFontRow.orientation = .horizontal
+        archiveFontRow.alignment = .centerY
+        archiveFontRow.spacing = 8
 
         let note = NSTextField(labelWithString: "Saved for every Quick Look preview.")
         note.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -95,6 +104,9 @@ final class SettingsWindow: NSWindow {
             ("Default view", markdownViewPopup),
             ("Font size", markdownFontRow),
         ])
+        let archiveGrid = form([
+            ("Font size", archiveFontRow),
+        ])
 
         let stack = NSStackView(views: [
             heading("3D preview"),
@@ -103,6 +115,8 @@ final class SettingsWindow: NSWindow {
             gcodeGrid,
             heading("Markdown preview"),
             markdownGrid,
+            heading("Archive preview"),
+            archiveGrid,
             note,
         ])
         stack.orientation = .vertical
@@ -110,7 +124,8 @@ final class SettingsWindow: NSWindow {
         stack.spacing = 10
         stack.setCustomSpacing(16, after: modelGrid)
         stack.setCustomSpacing(16, after: gcodeGrid)
-        stack.setCustomSpacing(18, after: markdownGrid)
+        stack.setCustomSpacing(16, after: markdownGrid)
+        stack.setCustomSpacing(18, after: archiveGrid)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         let content = contentView!
@@ -183,6 +198,11 @@ final class SettingsWindow: NSWindow {
         refreshMarkdownFontSize()
     }
 
+    @objc private func archiveStepperChanged() {
+        PreviewPreferences.archiveFontSize = CGFloat(archiveStepper.intValue)
+        refreshArchiveFontSize()
+    }
+
     private func refresh() {
         colorsCheckbox.state = PreviewPreferences.showModelColors ? .on : .off
         edgesCheckbox.state = PreviewPreferences.showEdges ? .on : .off
@@ -196,6 +216,7 @@ final class SettingsWindow: NSWindow {
         markdownViewPopup.selectItem(at: MarkdownViewMode.allCases.firstIndex(of: PreviewPreferences.markdownViewMode) ?? 0)
         refreshFontSize()
         refreshMarkdownFontSize()
+        refreshArchiveFontSize()
     }
 
     private func refreshFontSize() {
@@ -206,6 +227,11 @@ final class SettingsWindow: NSWindow {
     private func refreshMarkdownFontSize() {
         markdownSizeLabel.stringValue = "\(Int(PreviewPreferences.markdownFontSize)) pt"
         markdownStepper.intValue = Int32(PreviewPreferences.markdownFontSize)
+    }
+
+    private func refreshArchiveFontSize() {
+        archiveSizeLabel.stringValue = "\(Int(PreviewPreferences.archiveFontSize)) pt"
+        archiveStepper.intValue = Int32(PreviewPreferences.archiveFontSize)
     }
 
     private func configureFontStepper(_ stepper: NSStepper, action: Selector) {

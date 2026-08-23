@@ -35,7 +35,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
     private var previewURL: URL?
     private var markdownSource: String?
+    private var archiveDocument: ArchivePreview.Document?
     private var isMarkdownPreview = false
+    private var isArchivePreview = false
 
     /// The neutral finish used when the colour toggle is off.
     private static let uniformColor = NSColor(srgbRed: 0.72, green: 0.74, blue: 0.78, alpha: 1)
@@ -278,6 +280,22 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             return
         }
 
+        if ArchivePreview.isArchive(url) {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let started = CFAbsoluteTimeGetCurrent()
+                switch ArchivePreview.load(from: url) {
+                case .failure(let error):
+                    DispatchQueue.main.async { self?.showFailure(error.message) }
+                case .success(let document):
+                    let elapsed = CFAbsoluteTimeGetCurrent() - started
+                    DispatchQueue.main.async {
+                        self?.presentArchive(document, elapsed: elapsed)
+                    }
+                }
+            }
+            return
+        }
+
         if GCodePreview.isGCode(url) {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 let started = CFAbsoluteTimeGetCurrent()
@@ -340,7 +358,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         markdownModeControl.isHidden = true
         viewToggleBox.isHidden = true
         isMarkdownPreview = false
+        isArchivePreview = false
         markdownSource = nil
+        archiveDocument = nil
         infoLabel.onClick = nil
         infoLabel.toolTip = nil
     }
@@ -356,7 +376,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         infoLabel.toolTip = nil
 
         isMarkdownPreview = true
+        isArchivePreview = false
         markdownSource = source
+        archiveDocument = nil
         let mode = PreviewPreferences.markdownViewMode
         markdownModeControl.selectedSegment = MarkdownViewMode.allCases.firstIndex(of: mode) ?? 0
         markdownModeControl.isHidden = false
@@ -384,7 +406,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         markdownModeControl.isHidden = true
         openInFusionButton.isHidden = true
         isMarkdownPreview = false
+        isArchivePreview = false
         markdownSource = nil
+        archiveDocument = nil
         copyableDimensions = ""
         infoLabel.onClick = nil
         infoLabel.toolTip = nil
@@ -405,6 +429,36 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         qlLog.info("gcode highlighted in \(elapsed, format: .fixed(precision: 2))s")
     }
 
+    private func presentArchive(_ document: ArchivePreview.Document, elapsed: Double) {
+        spinner.stopAnimation(nil)
+        statusLabel.stringValue = ""
+        sceneView.isHidden = true
+        viewToggleBox.isHidden = true
+        markdownModeControl.isHidden = true
+        openInFusionButton.isHidden = true
+        isMarkdownPreview = false
+        isArchivePreview = true
+        markdownSource = nil
+        archiveDocument = document
+        copyableDimensions = ""
+        infoLabel.onClick = nil
+        infoLabel.toolTip = nil
+        smallerFontButton.toolTip = "Smaller archive listing text"
+        largerFontButton.toolTip = "Larger archive listing text"
+
+        applyArchiveContent()
+        textView.scrollToBeginningOfDocument(nil)
+        textScrollView.isHidden = false
+        refreshFontSizeControls()
+        fontSizeBox.isHidden = false
+
+        displayedInfo = document.info
+        infoLabel.stringValue = document.info
+        infoLabel.isHidden = false
+
+        qlLog.info("archive listed in \(elapsed, format: .fixed(precision: 2))s")
+    }
+
     private func present(geometry: SCNGeometry,
                          edges: SCNGeometry?,
                          colors: [NSColor],
@@ -418,7 +472,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         fontSizeBox.isHidden = true
         markdownModeControl.isHidden = true
         isMarkdownPreview = false
+        isArchivePreview = false
         markdownSource = nil
+        archiveDocument = nil
         sceneView.isHidden = false
         viewToggleBox.isHidden = false
 
@@ -689,7 +745,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
     private func applyTextWrapping(to width: CGFloat) {
         guard width > 0 else { return }
-        let wrap = isMarkdownPreview || PreviewPreferences.gcodeWrapping == .wrap
+        let wrap = isMarkdownPreview ||
+            (!isArchivePreview && PreviewPreferences.gcodeWrapping == .wrap)
         textView.isHorizontallyResizable = !wrap
         textView.textContainer?.widthTracksTextView = wrap
         textScrollView.hasHorizontalScroller = !wrap
@@ -726,6 +783,10 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             let next = PreviewPreferences.clamped(PreviewPreferences.markdownFontSize + delta)
             PreviewPreferences.markdownFontSize = next
             applyMarkdownContent()
+        } else if isArchivePreview {
+            let next = PreviewPreferences.clamped(PreviewPreferences.archiveFontSize + delta)
+            PreviewPreferences.archiveFontSize = next
+            applyArchiveContent()
         } else {
             let next = PreviewPreferences.clamped(PreviewPreferences.gcodeFontSize + delta)
             PreviewPreferences.gcodeFontSize = next
@@ -748,6 +809,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         applyTextWrapping(to: textScrollView.contentView.bounds.width)
     }
 
+    private func applyArchiveContent() {
+        guard let document = archiveDocument else { return }
+        let text = ArchivePreview.rendered(document, fontSize: PreviewPreferences.archiveFontSize)
+        textView.textStorage?.setAttributedString(text)
+        applyTextWrapping(to: textScrollView.contentView.bounds.width)
+    }
+
     private func applyGCodeFontSize(_ size: CGFloat) {
         guard let storage = textView.textStorage, storage.length > 0 else { return }
         storage.addAttribute(.font, value: GCodeHighlighter.font(size: size),
@@ -755,9 +823,14 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
 
     private func refreshFontSizeControls() {
-        let size = isMarkdownPreview
-            ? PreviewPreferences.markdownFontSize
-            : PreviewPreferences.gcodeFontSize
+        let size: CGFloat
+        if isMarkdownPreview {
+            size = PreviewPreferences.markdownFontSize
+        } else if isArchivePreview {
+            size = PreviewPreferences.archiveFontSize
+        } else {
+            size = PreviewPreferences.gcodeFontSize
+        }
         fontSizeLabel.stringValue = "\(Int(size)) pt"
         smallerFontButton.isEnabled = size > PreviewPreferences.minimumFontSize
         largerFontButton.isEnabled = size < PreviewPreferences.maximumFontSize

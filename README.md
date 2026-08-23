@@ -37,7 +37,8 @@ else to install.
 5. The app opens and shows its version. Quit it. That launch is all macOS needed;
    previews work whether or not the app is running.
 
-6. Select a `.step`, `.iges`, `.stl`, `.3mf`, `.nc`, `.tap` or `.md` file in the Finder and press the spacebar.
+6. Select a `.step`, `.iges`, `.stl`, `.3mf`, `.nc`, `.tap`, `.md`, `.zip`,
+   `.rar` or `.7z` file in the Finder and press the spacebar.
 
 ### Why macOS blocks it, and why step 4 matters
 
@@ -104,6 +105,12 @@ Markdown (`.md`, `.markdown`) is shown as a rendered document by default.
 **Settings** chooses which one a new preview starts on. **A−** and **A+**
 change the font size for that preview, separately from G-code.
 
+Zip, RAR and 7z archives are shown as a file listing: folders, names and
+uncompressed sizes, without extracting anything. **A−** and **A+** change
+the listing font size, saved separately from Markdown and G-code. A `.3mf`
+file is still a 3D preview, not a zip listing, even though the format is
+a zip under the hood.
+
 The first preview of a large file can take a few seconds. The panel says
 whether it is parsing or tessellating, and warns when the file is large enough
 that the wait is real. Every preview of that same file afterwards is instant,
@@ -119,6 +126,7 @@ because the result is cached.
 | 3MF | `.3mf` | no (basic mesh support) |
 | G-code | `.nc`, `.tap` | syntax highlighting (text, not a mesh) |
 | Markdown | `.md`, `.markdown` | rendered CommonMark, or the original source |
+| Archive | `.zip`, `.rar`, `.7z` | file listing (names and sizes, nothing extracted) |
 
 Model colours are read from the file where the exporter wrote them. Not every
 exporter writes them, so a part with no colour data falls back to neutral grey.
@@ -210,6 +218,8 @@ If it reports `gzip compressed data`, that is the known limitation below.
   the preview only appears on spacebar.
 * No OBJ or PLY support yet.
 * G-code is a highlighted text preview, not a 3D toolpath.
+* Archive preview is a listing only. Encrypted headers (some RAR files)
+  cannot be listed without a password.
 * Apple Silicon only. Intel is not supported.
 
 ## Support
@@ -372,6 +382,11 @@ Markdown files use the same text panel. Foundation parses CommonMark into
 attributed text for the rendered view; **Source** shows the file as written.
 The default view is a setting, and the control on the panel writes the same
 preference.
+
+Zip, RAR and 7z files also use the text panel. The extension reads the
+archive headers through the system libarchive and lists names and sizes;
+it does not unpack members. Archives with more than 10,000 entries show
+the start of the listing and note the rest.
 
 ## Licence
 

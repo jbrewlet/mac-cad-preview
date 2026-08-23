@@ -45,10 +45,12 @@ version is never edited anywhere else.
    IGES fixtures carry two colours; the STL one, which cannot carry colour, one.
 
 5. Preview each of `tests/spike.step`, `tests/spike.iges`, `tests/spike.stl`
-   `tests/spike.nc`, `tests/spike.tap` and `tests/spike.md` from the Finder
+   `tests/spike.nc`, `tests/spike.tap`, `tests/spike.md`, `tests/spike.zip`,
+   `tests/spike.rar` and `tests/spike.7z` from the Finder
    with the built app installed. The G-code fixtures should show highlighted
    text, not a 3D view. The Markdown fixture should open rendered, and the
-   **Source** segment should show the original text. Step 4 does not cover
+   **Source** segment should show the original text. The archive fixtures
+   should show a file listing, not a 3D view. Step 4 does not cover
    Quick Look itself — the extension registering, the panel appearing within the
    response timeout, and the controls responding. There is no automated test
    suite, so these two steps together are the gate.

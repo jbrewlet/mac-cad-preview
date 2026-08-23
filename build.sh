@@ -93,22 +93,30 @@ cp "$ROOT/src/xpc/Info.plist" "$XPC/Contents/Info.plist"
 
 # ----------------------------------------------------------- ql extension
 # An .appex has no main(); its entry point is NSExtensionMain from Foundation.
+say "Compiling archive listing"
+clang -std=c11 -O2 -fPIC \
+    -target "${ARCH}-apple-macos${DEPLOY}" \
+    -I"$ROOT/src/qlext" \
+    -c "$ROOT/src/qlext/archivelist.c" -o "$TMP/archivelist.o"
+
 say "Compiling Quick Look extension"
 swiftc -O \
     -target "${ARCH}-apple-macos${DEPLOY}" \
     -module-name MacCADPreviewQL \
     -parse-as-library \
     -application-extension \
-    -import-objc-header "$ROOT/src/core/cadmesh.h" \
+    -import-objc-header "$ROOT/src/qlext/QLBridging.h" \
+    -I"$ROOT/src/core" -I"$ROOT/src/qlext" \
     -framework Cocoa -framework Quartz -framework SceneKit \
-    "$TMP/cadmesh.o" "$TMP/read_3mf.o" \
-    -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -lc++ -lz \
+    "$TMP/cadmesh.o" "$TMP/read_3mf.o" "$TMP/archivelist.o" \
+    -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -lc++ -lz -larchive \
     -Xlinker -rpath -Xlinker "@loader_path/../Frameworks" \
     -Xlinker -e -Xlinker _NSExtensionMain \
     -o "$APPEX/Contents/MacOS/MacCADPreviewQL" \
     "$ROOT/src/qlext/PreviewViewController.swift" \
     "$ROOT/src/qlext/GCodeHighlighter.swift" \
     "$ROOT/src/qlext/MarkdownPreview.swift" \
+    "$ROOT/src/qlext/ArchivePreview.swift" \
     "$ROOT/src/shared/PreviewPreferences.swift" \
     "$ROOT/src/qlext/MeshData.swift" \
     "$ROOT/src/qlext/FusionOpener.swift" \
