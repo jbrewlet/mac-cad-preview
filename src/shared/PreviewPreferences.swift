@@ -67,6 +67,18 @@ enum GCodeTheme: String, CaseIterable {
     }
 }
 
+enum MarkdownViewMode: String, CaseIterable {
+    case rendered
+    case source
+
+    var title: String {
+        switch self {
+        case .rendered: return "Rendered"
+        case .source: return "Source"
+        }
+    }
+}
+
 /// Settings shared by the host app and the Quick Look extension.
 ///
 /// There is no Developer ID, so an App Group container is not available.
@@ -89,6 +101,8 @@ enum PreviewPreferences {
     private static let initialViewKey = "initialView"
     private static let gcodeWrappingKey = "gcodeWrapping"
     private static let gcodeThemeKey = "gcodeTheme"
+    private static let markdownViewModeKey = "markdownViewMode"
+    private static let markdownFontSizeKey = "markdownFontSize"
     private static let containerBundleID = "com.maccadpreview.quicklook"
     private static let queue = DispatchQueue(label: "com.maccadpreview.preferences")
     private static var cached: [String: Any]?
@@ -146,6 +160,17 @@ enum PreviewPreferences {
     static var gcodeTheme: GCodeTheme {
         get { value(gcodeThemeKey, default: .colourful) }
         set { queue.sync { update(gcodeThemeKey, newValue.rawValue) } }
+    }
+
+    /// Default for the Markdown preview: rendered CommonMark, or the raw source.
+    static var markdownViewMode: MarkdownViewMode {
+        get { value(markdownViewModeKey, default: .rendered) }
+        set { queue.sync { update(markdownViewModeKey, newValue.rawValue) } }
+    }
+
+    static var markdownFontSize: CGFloat {
+        get { queue.sync { clamped(read()[markdownFontSizeKey] as? Double) } }
+        set { queue.sync { update(markdownFontSizeKey, Double(clamped(newValue))) } }
     }
 
     static func clamped(_ size: CGFloat) -> CGFloat {

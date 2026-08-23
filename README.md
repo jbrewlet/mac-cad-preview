@@ -37,7 +37,7 @@ else to install.
 5. The app opens and shows its version. Quit it. That launch is all macOS needed;
    previews work whether or not the app is running.
 
-6. Select a `.step`, `.iges`, `.stl`, `.3mf`, `.nc` or `.tap` file in the Finder and press the spacebar.
+6. Select a `.step`, `.iges`, `.stl`, `.3mf`, `.nc`, `.tap` or `.md` file in the Finder and press the spacebar.
 
 ### Why macOS blocks it, and why step 4 matters
 
@@ -99,6 +99,11 @@ so a program is readable at a glance. **A−** and **A+** in the corner change
 the font size; the choice is saved. Line wrapping and the colour theme are
 in **Settings**, with the font size.
 
+Markdown (`.md`, `.markdown`) is shown as a rendered document by default.
+**Rendered** / **Source** in the corner switches to the original text, and
+**Settings** chooses which one a new preview starts on. **A−** and **A+**
+change the font size for that preview, separately from G-code.
+
 The first preview of a large file can take a few seconds. The panel says
 whether it is parsing or tessellating, and warns when the file is large enough
 that the wait is real. Every preview of that same file afterwards is instant,
@@ -113,6 +118,7 @@ because the result is cached.
 | STL | `.stl` | no (the format has none) |
 | 3MF | `.3mf` | no (basic mesh support) |
 | G-code | `.nc`, `.tap` | syntax highlighting (text, not a mesh) |
+| Markdown | `.md`, `.markdown` | rendered CommonMark, or the original source |
 
 Model colours are read from the file where the exporter wrote them. Not every
 exporter writes them, so a part with no colour data falls back to neutral grey.
@@ -361,6 +367,11 @@ and the geometry is filled in from a background queue when it is available.
 G-code files skip the geometry core. The extension reads the text, colours
 word-address codes and comments, and shows that in a scrollable view. Files
 larger than 1 MB are truncated so a long CAM program cannot stall the panel.
+
+Markdown files use the same text panel. Foundation parses CommonMark into
+attributed text for the rendered view; **Source** shows the file as written.
+The default view is a setting, and the control on the panel writes the same
+preference.
 
 ## Licence
 

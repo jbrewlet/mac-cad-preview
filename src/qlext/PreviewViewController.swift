@@ -29,10 +29,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     private var fontSizeLabel: NSTextField!
     private var smallerFontButton: NSButton!
     private var largerFontButton: NSButton!
+    private var markdownModeControl: NSSegmentedControl!
     private var openInFusionButton: FusionOpenButton!
     private var settingsLink: NSButton!
 
     private var previewURL: URL?
+    private var markdownSource: String?
+    private var isMarkdownPreview = false
 
     /// The neutral finish used when the colour toggle is off.
     private static let uniformColor = NSColor(srgbRed: 0.72, green: 0.74, blue: 0.78, alpha: 1)
@@ -174,6 +177,20 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         fontSizeBox.isHidden = true
         root.addSubview(fontSizeBox)
 
+        markdownModeControl = NSSegmentedControl(
+            labels: MarkdownViewMode.allCases.map(\.title),
+            trackingMode: .selectOne,
+            target: self,
+            action: #selector(markdownModeChanged)
+        )
+        markdownModeControl.segmentStyle = .rounded
+        markdownModeControl.controlSize = .small
+        markdownModeControl.font = .systemFont(ofSize: 11)
+        markdownModeControl.translatesAutoresizingMaskIntoConstraints = false
+        markdownModeControl.isHidden = true
+        markdownModeControl.toolTip = "Show rendered Markdown or the original source"
+        root.addSubview(markdownModeControl)
+
         openInFusionButton = FusionOpenButton()
         openInFusionButton.isHidden = true
         openInFusionButton.onClick = { [weak self] in self?.openInFusion() }
@@ -201,6 +218,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             fontSizeBox.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
             fontSizeBox.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
 
+            markdownModeControl.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
+            markdownModeControl.bottomAnchor.constraint(equalTo: fontSizeBox.topAnchor, constant: -6),
+
             infoLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
             infoLabel.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12),
 
@@ -223,7 +243,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        applyGCodeWrapping(to: textScrollView.contentView.bounds.width)
+        applyTextWrapping(to: textScrollView.contentView.bounds.width)
     }
 
     // MARK: - QLPreviewingController
@@ -240,6 +260,22 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             self.statusLabel.stringValue = "Opening \(url.lastPathComponent)…"
             self.spinner.startAnimation(nil)
             handler(nil)
+        }
+
+        if MarkdownPreview.isMarkdown(url) {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let started = CFAbsoluteTimeGetCurrent()
+                switch MarkdownPreview.load(from: url) {
+                case .failure(let error):
+                    DispatchQueue.main.async { self?.showFailure(error.message) }
+                case .success(let document):
+                    let elapsed = CFAbsoluteTimeGetCurrent() - started
+                    DispatchQueue.main.async {
+                        self?.presentMarkdown(document.source, info: document.info, elapsed: elapsed)
+                    }
+                }
+            }
+            return
         }
 
         if GCodePreview.isGCode(url) {
@@ -301,12 +337,15 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         sceneView.isHidden = true
         textScrollView.isHidden = true
         fontSizeBox.isHidden = true
+        markdownModeControl.isHidden = true
         viewToggleBox.isHidden = true
+        isMarkdownPreview = false
+        markdownSource = nil
         infoLabel.onClick = nil
         infoLabel.toolTip = nil
     }
 
-    private func presentGCode(_ text: NSAttributedString, info: String, elapsed: Double) {
+    private func presentMarkdown(_ source: String, info: String, elapsed: Double) {
         spinner.stopAnimation(nil)
         statusLabel.stringValue = ""
         sceneView.isHidden = true
@@ -316,8 +355,44 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         infoLabel.onClick = nil
         infoLabel.toolTip = nil
 
+        isMarkdownPreview = true
+        markdownSource = source
+        let mode = PreviewPreferences.markdownViewMode
+        markdownModeControl.selectedSegment = MarkdownViewMode.allCases.firstIndex(of: mode) ?? 0
+        markdownModeControl.isHidden = false
+        smallerFontButton.toolTip = "Smaller Markdown text"
+        largerFontButton.toolTip = "Larger Markdown text"
+
+        applyMarkdownContent()
+        textView.scrollToBeginningOfDocument(nil)
+        textScrollView.isHidden = false
+        refreshFontSizeControls()
+        fontSizeBox.isHidden = false
+
+        displayedInfo = info
+        infoLabel.stringValue = info
+        infoLabel.isHidden = false
+
+        qlLog.info("markdown presented in \(elapsed, format: .fixed(precision: 2))s")
+    }
+
+    private func presentGCode(_ text: NSAttributedString, info: String, elapsed: Double) {
+        spinner.stopAnimation(nil)
+        statusLabel.stringValue = ""
+        sceneView.isHidden = true
+        viewToggleBox.isHidden = true
+        markdownModeControl.isHidden = true
+        openInFusionButton.isHidden = true
+        isMarkdownPreview = false
+        markdownSource = nil
+        copyableDimensions = ""
+        infoLabel.onClick = nil
+        infoLabel.toolTip = nil
+        smallerFontButton.toolTip = "Smaller G-code text"
+        largerFontButton.toolTip = "Larger G-code text"
+
         textView.textStorage?.setAttributedString(text)
-        applyGCodeWrapping(to: textScrollView.contentView.bounds.width)
+        applyTextWrapping(to: textScrollView.contentView.bounds.width)
         textView.scrollToBeginningOfDocument(nil)
         textScrollView.isHidden = false
         refreshFontSizeControls()
@@ -341,6 +416,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         statusLabel.stringValue = ""
         textScrollView.isHidden = true
         fontSizeBox.isHidden = true
+        markdownModeControl.isHidden = true
+        isMarkdownPreview = false
+        markdownSource = nil
         sceneView.isHidden = false
         viewToggleBox.isHidden = false
 
@@ -609,9 +687,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         HostApp.requestOpenSettings()
     }
 
-    private func applyGCodeWrapping(to width: CGFloat) {
+    private func applyTextWrapping(to width: CGFloat) {
         guard width > 0 else { return }
-        let wrap = PreviewPreferences.gcodeWrapping == .wrap
+        let wrap = isMarkdownPreview || PreviewPreferences.gcodeWrapping == .wrap
         textView.isHorizontallyResizable = !wrap
         textView.textContainer?.widthTracksTextView = wrap
         textScrollView.hasHorizontalScroller = !wrap
@@ -629,18 +707,45 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     // MARK: - G-code font size
 
     @objc private func smallerGCodeFont() {
-        changeGCodeFontSize(by: -1)
+        changeTextFontSize(by: -1)
     }
 
     @objc private func largerGCodeFont() {
-        changeGCodeFontSize(by: 1)
+        changeTextFontSize(by: 1)
     }
 
-    private func changeGCodeFontSize(by delta: CGFloat) {
-        let next = PreviewPreferences.clamped(PreviewPreferences.gcodeFontSize + delta)
-        PreviewPreferences.gcodeFontSize = next
-        applyGCodeFontSize(next)
+    @objc private func markdownModeChanged() {
+        let index = markdownModeControl.selectedSegment
+        guard MarkdownViewMode.allCases.indices.contains(index) else { return }
+        PreviewPreferences.markdownViewMode = MarkdownViewMode.allCases[index]
+        applyMarkdownContent()
+    }
+
+    private func changeTextFontSize(by delta: CGFloat) {
+        if isMarkdownPreview {
+            let next = PreviewPreferences.clamped(PreviewPreferences.markdownFontSize + delta)
+            PreviewPreferences.markdownFontSize = next
+            applyMarkdownContent()
+        } else {
+            let next = PreviewPreferences.clamped(PreviewPreferences.gcodeFontSize + delta)
+            PreviewPreferences.gcodeFontSize = next
+            applyGCodeFontSize(next)
+        }
         refreshFontSizeControls()
+    }
+
+    private func applyMarkdownContent() {
+        guard let source = markdownSource else { return }
+        let size = PreviewPreferences.markdownFontSize
+        let text: NSAttributedString
+        switch PreviewPreferences.markdownViewMode {
+        case .rendered:
+            text = MarkdownPreview.rendered(source, fontSize: size)
+        case .source:
+            text = MarkdownPreview.sourceText(source, fontSize: size)
+        }
+        textView.textStorage?.setAttributedString(text)
+        applyTextWrapping(to: textScrollView.contentView.bounds.width)
     }
 
     private func applyGCodeFontSize(_ size: CGFloat) {
@@ -650,7 +755,9 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     }
 
     private func refreshFontSizeControls() {
-        let size = PreviewPreferences.gcodeFontSize
+        let size = isMarkdownPreview
+            ? PreviewPreferences.markdownFontSize
+            : PreviewPreferences.gcodeFontSize
         fontSizeLabel.stringValue = "\(Int(size)) pt"
         smallerFontButton.isEnabled = size > PreviewPreferences.minimumFontSize
         largerFontButton.isEnabled = size < PreviewPreferences.maximumFontSize

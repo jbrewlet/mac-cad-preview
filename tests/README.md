@@ -24,7 +24,9 @@ being covered changes.
 | --- | --- |
 | `spike.nc` | G-code text preview: comments, G/M words, axes, feed, speed, tool |
 | `spike.tap` | Same program, other claimed extension |
+| `spike.md` | Markdown preview: headings, emphasis, lists, a code block, a quote |
 
-The fixture is the same plate described as a short milling program, so the
+The G-code fixture is the same plate described as a short milling program, so the
 highlighted preview has something recognisable to read. It is not fed to
-`cadprobe`.
+`cadprobe`. The Markdown fixture covers the same part in prose, for the
+rendered / source toggle.

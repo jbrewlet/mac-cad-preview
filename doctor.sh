@@ -11,7 +11,7 @@ set -euo pipefail
 APP_NAME="Mac CAD Preview.app"
 BUNDLE_ID="com.maccadpreview.quicklook"
 QL_EXTENSION_POINT="com.apple.quicklook.preview"
-SUPPORTED_EXTS="step stp stpz p21 iges igs stl 3mf nc tap"
+SUPPORTED_EXTS="step stp stpz p21 iges igs stl 3mf nc tap md markdown"
 
 APP=""
 APPEX=""

@@ -18,8 +18,11 @@ final class SettingsWindow: NSWindow {
     private let initialViewPopup = NSPopUpButton()
     private let wrapPopup = NSPopUpButton()
     private let themePopup = NSPopUpButton()
+    private let markdownViewPopup = NSPopUpButton()
     private let sizeLabel = NSTextField(labelWithString: "")
     private let stepper = NSStepper()
+    private let markdownSizeLabel = NSTextField(labelWithString: "")
+    private let markdownStepper = NSStepper()
 
     init() {
         super.init(
@@ -50,21 +53,25 @@ final class SettingsWindow: NSWindow {
              action: #selector(wrapChanged))
         fill(themePopup, titles: GCodeTheme.allCases.map(\.title),
              action: #selector(themeChanged))
+        fill(markdownViewPopup, titles: MarkdownViewMode.allCases.map(\.title),
+             action: #selector(markdownViewChanged))
 
         sizeLabel.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         sizeLabel.setContentHuggingPriority(.required, for: .horizontal)
+        markdownSizeLabel.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        markdownSizeLabel.setContentHuggingPriority(.required, for: .horizontal)
 
-        stepper.minValue = Double(PreviewPreferences.minimumFontSize)
-        stepper.maxValue = Double(PreviewPreferences.maximumFontSize)
-        stepper.increment = 1
-        stepper.valueWraps = false
-        stepper.target = self
-        stepper.action = #selector(stepperChanged)
+        configureFontStepper(stepper, action: #selector(stepperChanged))
+        configureFontStepper(markdownStepper, action: #selector(markdownStepperChanged))
 
         let fontRow = NSStackView(views: [sizeLabel, stepper])
         fontRow.orientation = .horizontal
         fontRow.alignment = .centerY
         fontRow.spacing = 8
+        let markdownFontRow = NSStackView(views: [markdownSizeLabel, markdownStepper])
+        markdownFontRow.orientation = .horizontal
+        markdownFontRow.alignment = .centerY
+        markdownFontRow.spacing = 8
 
         let note = NSTextField(labelWithString: "Saved for every Quick Look preview.")
         note.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -84,19 +91,26 @@ final class SettingsWindow: NSWindow {
             ("Lines", wrapPopup),
             ("Colours", themePopup),
         ])
+        let markdownGrid = form([
+            ("Default view", markdownViewPopup),
+            ("Font size", markdownFontRow),
+        ])
 
         let stack = NSStackView(views: [
             heading("3D preview"),
             modelGrid,
             heading("G-code preview"),
             gcodeGrid,
+            heading("Markdown preview"),
+            markdownGrid,
             note,
         ])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 10
         stack.setCustomSpacing(16, after: modelGrid)
-        stack.setCustomSpacing(18, after: gcodeGrid)
+        stack.setCustomSpacing(16, after: gcodeGrid)
+        stack.setCustomSpacing(18, after: markdownGrid)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         let content = contentView!
@@ -160,6 +174,15 @@ final class SettingsWindow: NSWindow {
         refreshFontSize()
     }
 
+    @objc private func markdownViewChanged() {
+        PreviewPreferences.markdownViewMode = MarkdownViewMode.allCases[markdownViewPopup.indexOfSelectedItem]
+    }
+
+    @objc private func markdownStepperChanged() {
+        PreviewPreferences.markdownFontSize = CGFloat(markdownStepper.intValue)
+        refreshMarkdownFontSize()
+    }
+
     private func refresh() {
         colorsCheckbox.state = PreviewPreferences.showModelColors ? .on : .off
         edgesCheckbox.state = PreviewPreferences.showEdges ? .on : .off
@@ -170,12 +193,28 @@ final class SettingsWindow: NSWindow {
         initialViewPopup.selectItem(at: InitialView.allCases.firstIndex(of: PreviewPreferences.initialView) ?? 0)
         wrapPopup.selectItem(at: GCodeWrapping.allCases.firstIndex(of: PreviewPreferences.gcodeWrapping) ?? 0)
         themePopup.selectItem(at: GCodeTheme.allCases.firstIndex(of: PreviewPreferences.gcodeTheme) ?? 0)
+        markdownViewPopup.selectItem(at: MarkdownViewMode.allCases.firstIndex(of: PreviewPreferences.markdownViewMode) ?? 0)
         refreshFontSize()
+        refreshMarkdownFontSize()
     }
 
     private func refreshFontSize() {
         sizeLabel.stringValue = "\(Int(PreviewPreferences.gcodeFontSize)) pt"
         stepper.intValue = Int32(PreviewPreferences.gcodeFontSize)
+    }
+
+    private func refreshMarkdownFontSize() {
+        markdownSizeLabel.stringValue = "\(Int(PreviewPreferences.markdownFontSize)) pt"
+        markdownStepper.intValue = Int32(PreviewPreferences.markdownFontSize)
+    }
+
+    private func configureFontStepper(_ stepper: NSStepper, action: Selector) {
+        stepper.minValue = Double(PreviewPreferences.minimumFontSize)
+        stepper.maxValue = Double(PreviewPreferences.maximumFontSize)
+        stepper.increment = 1
+        stepper.valueWraps = false
+        stepper.target = self
+        stepper.action = action
     }
 
     private func heading(_ title: String) -> NSTextField {

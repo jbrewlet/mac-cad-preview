@@ -42,8 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         versionLine.translatesAutoresizingMaskIntoConstraints = false
 
         let body = NSTextField(labelWithString: """
-        Select a STEP, IGES, STL, 3MF or G-code file
-        in Finder and press the spacebar.
+        Select a STEP, IGES, STL, 3MF, G-code
+        or Markdown file in Finder and press
+        the spacebar.
 
         You can quit this app — the Quick Look
         extension keeps working without it.

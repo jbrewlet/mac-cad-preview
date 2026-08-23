@@ -123,9 +123,28 @@
 	<!-- Other CAD apps export their own UTIs for these extensions, and
 	     whichever one Launch Services picked is what Quick Look routes on.
 	     Import those types and list them in the extension so a file labelled
-	     by Shapr3D or BeLighten still gets a preview. -->
+	     by Shapr3D or BeLighten still gets a preview. Markdown already has
+	     a system UTI; import it rather than redeclare. -->
 	<key>UTImportedTypeDeclarations</key>
 	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>net.daringfireball.markdown</string>
+			<key>UTTypeDescription</key>
+			<string>Markdown</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.plain-text</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>md</string>
+					<string>markdown</string>
+				</array>
+			</dict>
+		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
 			<string>com.belighten.modelshow.3dfiles</string>

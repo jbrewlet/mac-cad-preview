@@ -32,6 +32,7 @@
 				<string>com.maccadpreview.iges</string>
 				<string>com.maccadpreview.3mf</string>
 				<string>com.maccadpreview.gcode</string>
+				<string>net.daringfireball.markdown</string>
 				<string>com.belighten.modelshow.3dfiles</string>
 				<!-- Shapr3D owns .step and .3mf wherever it is installed, so
 				     those files arrive as its types rather than ours. -->

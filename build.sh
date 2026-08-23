@@ -108,6 +108,7 @@ swiftc -O \
     -o "$APPEX/Contents/MacOS/MacCADPreviewQL" \
     "$ROOT/src/qlext/PreviewViewController.swift" \
     "$ROOT/src/qlext/GCodeHighlighter.swift" \
+    "$ROOT/src/qlext/MarkdownPreview.swift" \
     "$ROOT/src/shared/PreviewPreferences.swift" \
     "$ROOT/src/qlext/MeshData.swift" \
     "$ROOT/src/qlext/FusionOpener.swift" \

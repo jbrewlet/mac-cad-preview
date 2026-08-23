@@ -9,6 +9,13 @@ and the patch version for everything else.
 
 ## [Unreleased]
 
+### Added
+
+* Quick Look preview for Markdown (`.md`, `.markdown`). The panel can show
+  the rendered document or the original source; a **Rendered / Source**
+  control in the preview switches between them. The default is a setting,
+  and starts as rendered.
+
 ## [0.3.0] - 2026-08-13
 
 ### Added
