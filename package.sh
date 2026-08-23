@@ -50,7 +50,8 @@ Mac CAD Preview $VERSION
 4. Mac CAD Preview opens, showing its version number. Quit it. That launch is
    all macOS needed; previews work whether or not the app is running.
 
-5. Select a STEP, IGES, STL, 3MF, NC or TAP file in the Finder and press the spacebar.
+5. Select a STEP, IGES, STL, 3MF, NC, TAP, Markdown, ZIP, RAR or 7z
+   file in the Finder and press the spacebar.
 
 Why step 3 is necessary
 

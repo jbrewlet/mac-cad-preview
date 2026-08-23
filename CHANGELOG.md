@@ -9,6 +9,8 @@ and the patch version for everything else.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-23
+
 ### Added
 
 * Quick Look preview for Markdown (`.md`, `.markdown`). The panel can show
@@ -118,7 +120,8 @@ First release.
 * No Finder icon thumbnails. The preview only appears on spacebar.
 * No OBJ, PLY or 3MF support.
 
-[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.4.0
 [0.3.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.2.0
 [0.1.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.1.0

@@ -8,7 +8,8 @@ already preview images and PDFs.
 macOS has no idea what a STEP file is. Select one in the Finder, press space,
 and you get a blank document icon. This adds a Quick Look extension that reads
 the file, tessellates the real B-rep geometry, and shows an interactive 3D model
-you can orbit, zoom and inspect without opening Fusion.
+you can orbit, zoom and inspect without opening Fusion. Spacebar also
+lists zip, RAR and 7z archives, and shows G-code and Markdown as text.
 
 ## Demo
 
