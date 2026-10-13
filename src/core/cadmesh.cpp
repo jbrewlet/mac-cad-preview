@@ -31,6 +31,7 @@
 #include <IFSelect_ReturnStatus.hxx>
 #include <Message.hxx>
 #include <Quantity_ColorRGBA.hxx>
+#include <Standard_Failure.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
@@ -41,6 +42,8 @@
 #include <cstring>
 #include <cstdio>
 #include <map>
+#include <new>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -277,9 +280,11 @@ void appendTriangulation(const Handle(Poly_Triangulation) &tri,
         normals.insert(normals.end(), {0.0f, 0.0f, 0.0f});
     }
 
+    const int nodeCount = tri->NbNodes();
     for (int i = 1; i <= tri->NbTriangles(); ++i) {
         int a, b, c;
         tri->Triangle(i).Get(a, b, c);
+        if (a < 1 || b < 1 || c < 1 || a > nodeCount || b > nodeCount || c > nodeCount) continue;
         if (reversed) std::swap(b, c);
 
         const uint32_t ia = base + a - 1;
@@ -347,10 +352,8 @@ CADMesh *loadFromRawMesh(const RawMesh &raw) {
     return finalizeMesh(positions, normals, buckets, 1);
 }
 
-} // namespace
-
-extern "C" CADMesh *cadmesh_load(const char *path, double deflection,
-                                 cadmesh_progress_fn progress, void *context) {
+CADMesh *loadModel(const char *path, double deflection,
+                   cadmesh_progress_fn progress, void *context) {
     if (!path) return makeError("No file path given.");
 
     // OCCT is chatty on stdout by default; inside an app extension that is
@@ -456,9 +459,11 @@ extern "C" CADMesh *cadmesh_load(const char *path, double deflection,
             normals.insert(normals.end(), {0.0f, 0.0f, 0.0f});
         }
 
+        const int nodeCount = tri->NbNodes();
         for (int i = 1; i <= tri->NbTriangles(); ++i) {
             int a, b, c;
             tri->Triangle(i).Get(a, b, c);
+            if (a < 1 || b < 1 || c < 1 || a > nodeCount || b > nodeCount || c > nodeCount) continue;
             // A reversed face means the surface normal points the other way,
             // so flip the winding to keep the outside facing out.
             if (reversed) std::swap(b, c);
@@ -485,6 +490,23 @@ extern "C" CADMesh *cadmesh_load(const char *path, double deflection,
     }
 
     return finalizeMesh(positions, normals, buckets, faceCount);
+}
+
+} // namespace
+
+// Neither OpenCASCADE's exceptions nor the standard library's may unwind into
+// the Swift caller, which would abort the Quick Look extension.
+extern "C" CADMesh *cadmesh_load(const char *path, double deflection,
+                                 cadmesh_progress_fn progress, void *context) {
+    try {
+        return loadModel(path, deflection, progress, context);
+    } catch (const Standard_Failure &) {
+        return makeError("OpenCASCADE could not read this file.");
+    } catch (const std::bad_alloc &) {
+        return makeError("Out of memory reading this file.");
+    } catch (...) {
+        return makeError("Could not read this file.");
+    }
 }
 
 extern "C" void cadmesh_free(CADMesh *mesh) {

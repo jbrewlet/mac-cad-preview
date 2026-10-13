@@ -21,6 +21,21 @@ struct MeshData {
 
     var vertexCount: Int { positions.count / 3 }
     var triangleCount: Int { indices.count / 3 }
+
+    /// Every index names a real vertex and every group lies inside the index
+    /// buffer. SceneKit and the edge pass trust both, so a mesh that fails
+    /// this (a hostile file, or a damaged cache record) is never shown.
+    var isWellFormed: Bool {
+        guard positions.count % 3 == 0,
+              normals.count == positions.count,
+              indices.count % 3 == 0 else { return false }
+        let vertices = UInt32(clamping: vertexCount)
+        guard indices.allSatisfy({ $0 < vertices }) else { return false }
+        return groups.allSatisfy { group in
+            let end = UInt64(group.firstIndex) + UInt64(group.indexCount)
+            return group.indexCount % 3 == 0 && end <= UInt64(indices.count)
+        }
+    }
 }
 
 extension MeshData {
@@ -139,6 +154,7 @@ extension MeshData {
             else { return nil }
             groups.append(MeshGroup(firstIndex: first, indexCount: count, rgba: (r, g, b, a)))
         }
+        guard isWellFormed else { return nil }
     }
 }
 
