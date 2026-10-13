@@ -87,8 +87,14 @@ enum FusionOpener {
     // MARK: - XPC helper
 
     static func openInFusion(path: String, reply: @escaping (Bool) -> Void) {
-        let url = URL(fileURLWithPath: path)
-        guard canOpen(url), let fusion = applicationURL else {
+        let url = URL(fileURLWithPath: path).standardizedFileURL
+        // The helper runs unsandboxed, so it only hands Fusion an existing
+        // regular file with a CAD extension, never a folder or a bundle.
+        var isDirectory: ObjCBool = false
+        guard url.isFileURL,
+              FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+              !isDirectory.boolValue,
+              canOpen(url), let fusion = applicationURL else {
             reply(false)
             return
         }

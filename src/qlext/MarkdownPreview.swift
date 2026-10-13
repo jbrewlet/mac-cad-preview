@@ -124,7 +124,14 @@ enum MarkdownRenderer {
         }
 
         output.enumerateAttribute(.link, in: full) { value, range, _ in
-            guard value != nil else { return }
+            guard let value else { return }
+            // A previewed file is untrusted: only web and mail links stay
+            // clickable. file://, custom app schemes and the like become text.
+            let url = value as? URL ?? (value as? String).flatMap(URL.init(string:))
+            guard let scheme = url?.scheme?.lowercased(), allowedLinkSchemes.contains(scheme) else {
+                output.removeAttribute(.link, range: range)
+                return
+            }
             output.addAttribute(.foregroundColor, value: NSColor.linkColor, range: range)
             output.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
         }
@@ -306,6 +313,8 @@ enum MarkdownRenderer {
 
         output.addAttribute(.font, value: font, range: range)
     }
+
+    private static let allowedLinkSchemes: Set<String> = ["http", "https", "mailto"]
 
     private static func paragraphStyle(spacing: CGFloat, indent: CGFloat) -> NSParagraphStyle {
         let style = NSMutableParagraphStyle()

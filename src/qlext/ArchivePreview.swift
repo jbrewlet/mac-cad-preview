@@ -14,6 +14,11 @@ enum ArchivePreview {
     /// counted for the summary and then dropped.
     private static let maxEntries = 10_000
 
+    /// Deeper folders are folded into their ancestor at this depth, so a
+    /// hostile path with thousands of components cannot blow up the indent
+    /// text or the recursion that lays it out.
+    private static let maxDepth = 64
+
     struct Entry {
         var path: String
         var size: Int64?
@@ -123,8 +128,12 @@ enum ArchivePreview {
     }
 
     private static func insert(_ entry: Entry, into root: Node) {
-        let parts = entry.path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        var parts = entry.path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
         guard !parts.isEmpty else { return }
+        if parts.count > maxDepth {
+            let tail = parts[(maxDepth - 1)...].joined(separator: "/")
+            parts = Array(parts[..<(maxDepth - 1)]) + [tail]
+        }
         var node = root
         for (index, part) in parts.enumerated() {
             let last = index == parts.count - 1
