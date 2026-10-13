@@ -322,17 +322,23 @@ CADMesh *loadFromTriangulations(const NCollection_Sequence<Handle(Poly_Triangula
 
 CADMesh *loadFromRawMesh(const RawMesh &raw) {
     std::vector<float> positions = raw.positions;
+    positions.resize(positions.size() - positions.size() % 3);
     std::vector<float> normals(positions.size(), 0.0f);
     std::map<ColorKey, std::vector<uint32_t>> buckets;
     const ColorKey key = packColor(kDefaultColor[0], kDefaultColor[1],
                                    kDefaultColor[2], kDefaultColor[3]);
     std::vector<uint32_t> &bucket = buckets[key];
-    bucket = raw.indices;
+    bucket.reserve(raw.indices.size());
 
+    // The indices come from the file. Any that point past the vertex buffer
+    // are dropped here, before they are used to read or write it.
+    const size_t vertexCount = positions.size() / 3;
     for (size_t i = 0; i + 2 < raw.indices.size(); i += 3) {
         const uint32_t ia = raw.indices[i];
         const uint32_t ib = raw.indices[i + 1];
         const uint32_t ic = raw.indices[i + 2];
+        if (ia >= vertexCount || ib >= vertexCount || ic >= vertexCount) continue;
+        bucket.insert(bucket.end(), {ia, ib, ic});
         const gp_Vec v0(positions[ia * 3], positions[ia * 3 + 1], positions[ia * 3 + 2]);
         const gp_Vec v1(positions[ib * 3], positions[ib * 3 + 1], positions[ib * 3 + 2]);
         const gp_Vec v2(positions[ic * 3], positions[ic * 3 + 1], positions[ic * 3 + 2]);
@@ -344,6 +350,7 @@ CADMesh *loadFromRawMesh(const RawMesh &raw) {
         }
     }
 
+    if (bucket.empty()) return makeError("This 3MF file contained no valid triangles.");
     return finalizeMesh(positions, normals, buckets, 1);
 }
 
