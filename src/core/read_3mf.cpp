@@ -444,6 +444,8 @@ struct ResolveState {
     size_t calls = 0;
     bool overBudget = false;
 
+    explicit ResolveState(const std::map<std::string, std::string> &m) : models(m) {}
+
     const ObjectMap *objectsIn(const std::string &path) {
         const auto cached = parsed.find(path);
         if (cached != parsed.end()) return &cached->second;
