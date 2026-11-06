@@ -145,6 +145,10 @@ extension MeshData {
         else { return nil }
         positions = p; normals = n; indices = i
 
+        // Each group is 24 bytes on disk; a damaged count must not reserve
+        // more memory than the file could possibly hold.
+        let groupBytes = 2 * MemoryLayout<UInt32>.size + 4 * MemoryLayout<Float>.size
+        guard Int(groupCount) <= (data.count - offset) / groupBytes else { return nil }
         groups = []
         groups.reserveCapacity(Int(groupCount))
         for _ in 0..<Int(groupCount) {
