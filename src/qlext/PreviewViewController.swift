@@ -937,7 +937,11 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         if let error = mesh.error {
             return .failure(MeshLoadError(message: String(cString: error)))
         }
-        return .success(MeshData(copying: mesh))
+        let data = MeshData(copying: mesh)
+        guard data.isWellFormed else {
+            return .failure(MeshLoadError(message: "This model's mesh data is inconsistent."))
+        }
+        return .success(data)
     }
 
     private static let reportLoadProgress: cadmesh_progress_fn = { stage, context in
@@ -1030,10 +1034,18 @@ enum MeshEdges {
             var normals: [SIMD3<Float>]
         }
 
+        // Relative to the box corner, so a small part far from the origin
+        // still fits Int32. Non-finite or out-of-range values are clamped
+        // rather than trapping the conversion.
+        let origin = mesh.bboxMin
+        func quantize(_ v: Float) -> Int32 {
+            let scaled = (v * scale).rounded()
+            guard scaled.isFinite else { return 0 }
+            return Int32(max(min(scaled, 2_000_000_000), -2_000_000_000))
+        }
         func quantize(_ p: SIMD3<Float>) -> Quantized {
-            Quantized(x: Int32((p.x * scale).rounded()),
-                      y: Int32((p.y * scale).rounded()),
-                      z: Int32((p.z * scale).rounded()))
+            let d = p - origin
+            return Quantized(x: quantize(d.x), y: quantize(d.y), z: quantize(d.z))
         }
         func key(_ p: SIMD3<Float>, _ q: SIMD3<Float>) -> Key {
             let a = quantize(p), b = quantize(q)
