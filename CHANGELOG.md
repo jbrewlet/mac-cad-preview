@@ -9,6 +9,40 @@ and the patch version for everything else.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-05
+
+### Added
+
+* Quick Look preview for ASCII DXF (`.dxf`) drawings, read by a built-in
+  parser with no new dependency. Lines, arcs, circles, ellipses, polylines
+  (with bulge arcs) and splines are drawn as hairlines; blocks, nested
+  inserts and arrays are expanded; 3D faces, solids and polyface meshes are
+  shaded. Frozen and switched-off layers and paper space are left out. Flat
+  drawings open from above in orthographic and never rotate: two finger
+  scroll or a drag pans, pinch or a mouse wheel zooms. Text and hatches are
+  not drawn yet, and the preview says so.
+* Quick Look preview for DWG (`.dwg`) drawings. LibreDWG's `dwg2dxf`, bundled
+  as a separate program in its own locked-down process, converts the file to
+  DXF for the reader above; a conversion that fails or runs past 20 seconds
+  shows an error instead of a preview.
+
+### Changed
+
+* Building from source now needs LibreDWG as well as OpenCASCADE.
+  `install.sh` installs it with Homebrew.
+* The mesh cache format changed, so every file is parsed afresh the first
+  time it is previewed after updating.
+
+### Security
+
+* 3MF files are parsed with every zip offset, size and triangle index
+  bounds-checked, so a hostile file cannot corrupt memory (#3).
+* Malformed meshes, from a parser or from a damaged cache entry, show an error
+  instead of crashing the preview (#4).
+* Archive listings cap folder depth, Markdown previews only make web and
+  email links clickable, and **Open in Fusion** only hands Fusion a real CAD
+  file, after resolving symlinks (#5).
+
 ## [0.4.0] - 2026-08-23
 
 ### Added
@@ -120,7 +154,8 @@ First release.
 * No Finder icon thumbnails. The preview only appears on spacebar.
 * No OBJ, PLY or 3MF support.
 
-[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jbrewlet/mac-cad-preview/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.5.0
 [0.4.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.4.0
 [0.3.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jbrewlet/mac-cad-preview/releases/tag/v0.2.0
