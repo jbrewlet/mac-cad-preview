@@ -12,6 +12,7 @@ APP="$BUILD/Mac CAD Preview.app"
 APPEX="$APP/Contents/PlugIns/MacCADPreviewQL.appex"
 FRAMEWORKS="$APPEX/Contents/Frameworks"
 OCC="$(brew --prefix opencascade)"
+REDWG="$(brew --prefix libredwg)"
 DEPLOY="12.0"
 
 # Homebrew's OpenCASCADE is arm64-only, so this build is arm64-only too.
@@ -51,13 +52,17 @@ clang++ -std=c++17 -O2 -fPIC \
     -target "${ARCH}-apple-macos${DEPLOY}" \
     -I"$OCC/include/opencascade" -I"$ROOT/src/core" \
     -c "$ROOT/src/core/read_3mf.cpp" -o "$TMP/read_3mf.o"
+clang++ -std=c++17 -O2 -fPIC \
+    -target "${ARCH}-apple-macos${DEPLOY}" \
+    -I"$ROOT/src/core" \
+    -c "$ROOT/src/core/read_dxf.cpp" -o "$TMP/read_dxf.o"
 
 say "Building probe CLI"
 clang++ -std=c++17 -O2 \
     -target "${ARCH}-apple-macos${DEPLOY}" \
     -I"$OCC/include/opencascade" -I"$ROOT/src/core" \
     -DCADPROBE_VERSION="\"$VERSION\"" \
-    "$TMP/cadmesh.o" "$TMP/read_3mf.o" "$ROOT/src/core/probe_main.cpp" \
+    "$TMP/cadmesh.o" "$TMP/read_3mf.o" "$TMP/read_dxf.o" "$ROOT/src/core/probe_main.cpp" \
     -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -lz -Wl,-rpath,"$OCC/lib" \
     -o "$BUILD/cadprobe"
 
@@ -91,6 +96,19 @@ swiftc -O \
     "$ROOT/src/shared/HostApp.swift"
 cp "$ROOT/src/xpc/Info.plist" "$XPC/Contents/Info.plist"
 
+# Quick Look extensions may not start programs, so DWG conversion runs in its
+# own sandboxed service rather than the unsandboxed helper above.
+DWGXPC="$APPEX/Contents/XPCServices/MacCADPreviewDWG.xpc"
+mkdir -p "$DWGXPC/Contents/MacOS" "$DWGXPC/Contents/Resources"
+say "Compiling DWG conversion service"
+swiftc -O \
+    -target "${ARCH}-apple-macos${DEPLOY}" \
+    -module-name MacCADPreviewDWG \
+    -o "$DWGXPC/Contents/MacOS/MacCADPreviewDWG" \
+    "$ROOT/src/dwgxpc/main.swift" \
+    "$ROOT/src/shared/DWGConversionXPC.swift"
+cp "$ROOT/src/dwgxpc/Info.plist" "$DWGXPC/Contents/Info.plist"
+
 # ----------------------------------------------------------- ql extension
 # An .appex has no main(); its entry point is NSExtensionMain from Foundation.
 say "Compiling archive listing"
@@ -108,7 +126,7 @@ swiftc -O \
     -import-objc-header "$ROOT/src/qlext/QLBridging.h" \
     -I"$ROOT/src/core" -I"$ROOT/src/qlext" \
     -framework Cocoa -framework Quartz -framework SceneKit \
-    "$TMP/cadmesh.o" "$TMP/read_3mf.o" "$TMP/archivelist.o" \
+    "$TMP/cadmesh.o" "$TMP/read_3mf.o" "$TMP/read_dxf.o" "$TMP/archivelist.o" \
     -L"$OCC/lib" "${OCC_LIBS[@]/#/-l}" -lc++ -lz -larchive \
     -Xlinker -rpath -Xlinker "@loader_path/../Frameworks" \
     -Xlinker -e -Xlinker _NSExtensionMain \
@@ -117,14 +135,28 @@ swiftc -O \
     "$ROOT/src/qlext/GCodeHighlighter.swift" \
     "$ROOT/src/qlext/MarkdownPreview.swift" \
     "$ROOT/src/qlext/ArchivePreview.swift" \
+    "$ROOT/src/qlext/DWGConverter.swift" \
     "$ROOT/src/shared/PreviewPreferences.swift" \
     "$ROOT/src/qlext/MeshData.swift" \
     "$ROOT/src/qlext/FusionOpener.swift" \
     "$ROOT/src/shared/FusionXPC.swift" \
+    "$ROOT/src/shared/DWGConversionXPC.swift" \
     "$ROOT/src/shared/HostApp.swift" \
     "$ROOT/src/qlext/FusionOpenButton.swift"
 cp "$ROOT/src/qlext/Info.plist" "$APPEX/Contents/Info.plist"
 stamp_version "$APPEX/Contents/Info.plist"
+
+# ---------------------------------------------------------- dwg converter
+# LibreDWG is GPL, so it ships as its own program, never linked into our code.
+# The DWG conversion service runs it in a child process to turn DWG into DXF.
+# Its libraries live with the extension's, four levels up from the service.
+say "Adding DWG converter (LibreDWG $(brew list --versions libredwg | cut -d' ' -f2))"
+DWG2DXF="$DWGXPC/Contents/MacOS/dwg2dxf"
+cp -L "$REDWG/bin/dwg2dxf" "$DWG2DXF"
+chmod u+w "$DWG2DXF"
+codesign --remove-signature "$DWG2DXF"     # re-signed, sandboxed, below
+install_name_tool -add_rpath "@executable_path/../../../../Frameworks" "$DWG2DXF"
+cp "$REDWG/COPYING" "$DWGXPC/Contents/Resources/LibreDWG-COPYING.txt"
 
 # ------------------------------------------------------------- dylib bundling
 # A sandboxed extension cannot be relied on to load libraries out of
@@ -152,7 +184,7 @@ resolve_dep() {
 changed=1
 while [ "$changed" -eq 1 ]; do
     changed=0
-    for bin in "$EXE" "$FRAMEWORKS"/*.dylib; do
+    for bin in "$EXE" "$DWG2DXF" "$FRAMEWORKS"/*.dylib; do
         [ -e "$bin" ] || continue
         while read -r dep; do
             src="$(resolve_dep "$dep")"
@@ -167,9 +199,9 @@ while [ "$changed" -eq 1 ]; do
     done
 done
 
-for bin in "$EXE" "$FRAMEWORKS"/*.dylib; do
+for bin in "$EXE" "$DWG2DXF" "$FRAMEWORKS"/*.dylib; do
     [ -e "$bin" ] || continue
-    if [ "$bin" != "$EXE" ]; then
+    if [ "$bin" != "$EXE" ] && [ "$bin" != "$DWG2DXF" ]; then
         install_name_tool -id "@rpath/$(basename "$bin")" "$bin" 2>/dev/null || true
     fi
     while read -r dep; do
@@ -196,6 +228,12 @@ for lib in "$FRAMEWORKS"/*.dylib; do
     [ -e "$lib" ] || continue
     codesign --force --sign - --timestamp=none "$lib"
 done
+codesign --force --sign - \
+    --entitlements "$ROOT/src/dwgxpc/dwg2dxf-entitlements.plist" \
+    --timestamp=none "$DWG2DXF"
+codesign --force --sign - \
+    --entitlements "$ROOT/src/dwgxpc/entitlements.plist" \
+    --timestamp=none "$DWGXPC"
 codesign --force --sign - --timestamp=none "$XPC"
 codesign --force --sign - \
     --entitlements "$ROOT/src/qlext/entitlements.plist" \

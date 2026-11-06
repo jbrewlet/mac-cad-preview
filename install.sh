@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Installs Mac CAD Preview: checks the machine can run it, gets the one
-# dependency, builds from source, and puts the app in /Applications.
+# Installs Mac CAD Preview: checks the machine can run it, gets the build
+# dependencies, builds from source, and puts the app in /Applications.
 #
 #   ./install.sh              install the most recent release
 #   ./install.sh --ref main   install the latest development revision
@@ -25,8 +25,8 @@ WORKDIR=""
 
 usage() {
     cat <<'EOF'
-Installs Mac CAD Preview: checks the machine can run it, gets the one
-dependency, builds from source, and puts the app in /Applications.
+Installs Mac CAD Preview: checks the machine can run it, gets the build
+dependencies, builds from source, and puts the app in /Applications.
 
   ./install.sh              install the most recent release
   ./install.sh --ref main   install the latest development revision
@@ -121,7 +121,7 @@ ensure_homebrew() {
         if [ -x /opt/homebrew/bin/brew ]; then
             eval "$(/opt/homebrew/bin/brew shellenv)"
         else
-            say "Homebrew is needed to install OpenCASCADE, the one dependency"
+            say "Homebrew is needed to install OpenCASCADE and LibreDWG"
             printf '    It is a package manager for macOS: https://brew.sh\n'
             confirm "Install Homebrew now?" || die \
                 "install Homebrew from https://brew.sh, then run this again"
@@ -137,6 +137,13 @@ ensure_homebrew() {
     else
         say "Installing OpenCASCADE (this is a large download, give it a while)"
         brew install opencascade
+    fi
+
+    if brew list --versions libredwg >/dev/null 2>&1; then
+        say "LibreDWG is already installed"
+    else
+        say "Installing LibreDWG (converts DWG drawings for preview)"
+        brew install libredwg
     fi
 }
 

@@ -9,6 +9,7 @@ enum FusionOpener {
     private static let supportedExtensions: Set<String> = [
         "step", "stp", "p21",
         "iges", "igs",
+        "dxf", "dwg",
     ]
 
     private static let bundleIdentifiers = [

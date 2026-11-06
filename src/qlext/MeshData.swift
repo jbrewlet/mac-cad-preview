@@ -18,6 +18,8 @@ struct MeshData {
     var bboxMin: SIMD3<Float>
     var bboxMax: SIMD3<Float>
     var info: String
+    /// Drawing linework (DXF): 6 floats, two points, per segment.
+    var lines: [Float] = []
 
     var vertexCount: Int { positions.count / 3 }
     var triangleCount: Int { indices.count / 3 }
@@ -28,7 +30,8 @@ struct MeshData {
     var isWellFormed: Bool {
         guard positions.count % 3 == 0,
               normals.count == positions.count,
-              indices.count % 3 == 0 else { return false }
+              indices.count % 3 == 0,
+              lines.count % 6 == 0 else { return false }
         let vertices = UInt32(clamping: vertexCount)
         guard indices.allSatisfy({ $0 < vertices }) else { return false }
         return groups.allSatisfy { group in
@@ -57,13 +60,22 @@ extension MeshData {
         bboxMin = SIMD3<Float>(mesh.bboxMin.0, mesh.bboxMin.1, mesh.bboxMin.2)
         bboxMax = SIMD3<Float>(mesh.bboxMax.0, mesh.bboxMax.1, mesh.bboxMax.2)
         info = mesh.info.map { String(cString: $0) } ?? ""
+        lines = Array(UnsafeBufferPointer(start: mesh.lines, count: Int(mesh.lineSegmentCount) * 6))
+    }
+
+    /// A drawing that lies in one plane (a typical 2D DXF), which reads best
+    /// looking straight down in orthographic.
+    var isPlanarDrawing: Bool {
+        guard !lines.isEmpty else { return false }
+        let extent = bboxMax - bboxMin
+        return extent.z <= max(extent.x, extent.y) * 1e-6
     }
 }
 
 // MARK: - Serialisation
 
 private let kMagic: UInt32 = 0x43414450   // "CADP"
-private let kVersion: UInt32 = 2
+private let kVersion: UInt32 = 3
 
 extension MeshData {
 
@@ -85,12 +97,14 @@ extension MeshData {
         append(UInt32(indices.count))
         append(UInt32(groups.count))
         append(UInt32(infoBytes.count))
+        append(UInt32(lines.count))
         for v in [bboxMin.x, bboxMin.y, bboxMin.z, bboxMax.x, bboxMax.y, bboxMax.z] { append(v) }
 
         out.append(contentsOf: infoBytes)
         appendArray(positions)
         appendArray(normals)
         appendArray(indices)
+        appendArray(lines)
         for g in groups {
             append(g.firstIndex); append(g.indexCount)
             append(g.rgba.0); append(g.rgba.1); append(g.rgba.2); append(g.rgba.3)
@@ -125,7 +139,8 @@ extension MeshData {
               let normalCount = read(UInt32.self),
               let indexCount = read(UInt32.self),
               let groupCount = read(UInt32.self),
-              let infoLength = read(UInt32.self)
+              let infoLength = read(UInt32.self),
+              let lineCount = read(UInt32.self), lineCount % 6 == 0
         else { return nil }
 
         var box = [Float]()
@@ -141,9 +156,10 @@ extension MeshData {
 
         guard let p = readArray(Float.self, count: Int(positionCount)),
               let n = readArray(Float.self, count: Int(normalCount)),
-              let i = readArray(UInt32.self, count: Int(indexCount))
+              let i = readArray(UInt32.self, count: Int(indexCount)),
+              let l = readArray(Float.self, count: Int(lineCount))
         else { return nil }
-        positions = p; normals = n; indices = i
+        positions = p; normals = n; indices = i; lines = l
 
         // Each group is 24 bytes on disk; a damaged count must not reserve
         // more memory than the file could possibly hold.

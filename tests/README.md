@@ -11,6 +11,8 @@ preview of that same plate, not a mesh.
 | `spike.step` | Trimmed NURBS tessellation, and two `styled_item` colours |
 | `spike.iges` | The IGES reader, on the same geometry |
 | `spike.stl` | The mesh reader, ASCII, no colour |
+| `spike.dxf` | The DXF reader's shaded path: two parallel rectangular 3D faces |
+| `spike-2d.dxf` | The DXF reader's linework: every supported entity, blocks with rotated, scaled, mirrored and arrayed inserts, plus frozen and off layers, paper space and text that must not be drawn |
 
 The rounded edges and the bore mean these carry toroidal, spherical and
 cylindrical faces, not just planes — a reader that mishandles trimmed surfaces

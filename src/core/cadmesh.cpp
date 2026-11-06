@@ -1,5 +1,6 @@
 #include "cadmesh.h"
 #include "read_3mf.h"
+#include "read_dxf.h"
 
 #include <STEPCAFControl_Reader.hxx>
 #include <IGESCAFControl_Reader.hxx>
@@ -178,26 +179,48 @@ bool readWithColors(const std::string &path, const std::string &ext,
     return true;
 }
 
+// Copies a vector into a malloc'd buffer the C caller frees. An empty vector
+// becomes NULL, which is not a failure.
+template <typename T>
+bool copyOut(const std::vector<T> &source, T *&destination) {
+    destination = nullptr;
+    if (source.empty()) return true;
+    destination = static_cast<T *>(std::malloc(source.size() * sizeof(T)));
+    if (!destination) return false;
+    std::memcpy(destination, source.data(), source.size() * sizeof(T));
+    return true;
+}
+
+// `lines` holds drawing linework (6 floats per segment) alongside or instead
+// of triangles. A non-empty `summary` replaces the default second info line.
 CADMesh *finalizeMesh(std::vector<float> &positions,
                       std::vector<float> &normals,
                       std::map<ColorKey, std::vector<uint32_t>> &buckets,
-                      int faceCount) {
-    if (buckets.empty() || positions.size() < 3) {
+                      int faceCount,
+                      const std::vector<float> &lines = {},
+                      const std::string &summary = "") {
+    const bool hasTriangles = !buckets.empty() && positions.size() >= 3;
+    if (!hasTriangles && lines.size() < 6) {
         return makeError("Nothing could be tessellated from this model.");
     }
 
-    // Frame and dimensions come from the triangles we actually drew.
-    // BRepBndLib on Rhino STEP often reports the untrimmed NURBS hull,
+    // Frame and dimensions come from the triangles and lines we actually
+    // drew. BRepBndLib on Rhino STEP often reports the untrimmed NURBS hull,
     // which can be metres across for a part that is a few hundred mm.
-    double xMin = positions[0], yMin = positions[1], zMin = positions[2];
+    const std::vector<float> &seed = hasTriangles ? positions : lines;
+    double xMin = seed[0], yMin = seed[1], zMin = seed[2];
     double xMax = xMin, yMax = yMin, zMax = zMin;
-    for (size_t i = 0; i + 2 < positions.size(); i += 3) {
-        xMin = std::min(xMin, static_cast<double>(positions[i]));
-        yMin = std::min(yMin, static_cast<double>(positions[i + 1]));
-        zMin = std::min(zMin, static_cast<double>(positions[i + 2]));
-        xMax = std::max(xMax, static_cast<double>(positions[i]));
-        yMax = std::max(yMax, static_cast<double>(positions[i + 1]));
-        zMax = std::max(zMax, static_cast<double>(positions[i + 2]));
+    const std::vector<float> &triangleCorners = positions;
+    for (const std::vector<float> *points : {&triangleCorners, &lines}) {
+        for (size_t i = 0; i + 2 < points->size(); i += 3) {
+            const float *p = points->data() + i;
+            xMin = std::min(xMin, static_cast<double>(p[0]));
+            yMin = std::min(yMin, static_cast<double>(p[1]));
+            zMin = std::min(zMin, static_cast<double>(p[2]));
+            xMax = std::max(xMax, static_cast<double>(p[0]));
+            yMax = std::max(yMax, static_cast<double>(p[1]));
+            zMax = std::max(zMax, static_cast<double>(p[2]));
+        }
     }
 
     for (size_t i = 0; i + 2 < normals.size(); i += 3) {
@@ -226,21 +249,19 @@ CADMesh *finalizeMesh(std::vector<float> &positions,
     CADMesh *mesh = static_cast<CADMesh *>(std::calloc(1, sizeof(CADMesh)));
     if (!mesh) return nullptr;
 
-    mesh->vertexCount   = static_cast<uint32_t>(positions.size() / 3);
-    mesh->triangleCount = static_cast<uint32_t>(indices.size() / 3);
-    mesh->groupCount    = static_cast<uint32_t>(groups.size());
-    mesh->positions = static_cast<float *>(std::malloc(positions.size() * sizeof(float)));
-    mesh->normals   = static_cast<float *>(std::malloc(normals.size() * sizeof(float)));
-    mesh->indices   = static_cast<uint32_t *>(std::malloc(indices.size() * sizeof(uint32_t)));
-    mesh->groups    = static_cast<CADMeshGroup *>(std::malloc(groups.size() * sizeof(CADMeshGroup)));
-    if (!mesh->positions || !mesh->normals || !mesh->indices || !mesh->groups) {
+    const size_t lineFloats = lines.size() - lines.size() % 6;
+    const std::vector<float> lineData(lines.begin(), lines.begin() + lineFloats);
+
+    mesh->vertexCount      = static_cast<uint32_t>(positions.size() / 3);
+    mesh->triangleCount    = static_cast<uint32_t>(indices.size() / 3);
+    mesh->groupCount       = static_cast<uint32_t>(groups.size());
+    mesh->lineSegmentCount = static_cast<uint32_t>(lineFloats / 6);
+    if (!copyOut(positions, mesh->positions) || !copyOut(normals, mesh->normals) ||
+        !copyOut(indices, mesh->indices) || !copyOut(groups, mesh->groups) ||
+        !copyOut(lineData, mesh->lines)) {
         cadmesh_free(mesh);
         return makeError("Out of memory building mesh.");
     }
-    std::memcpy(mesh->positions, positions.data(), positions.size() * sizeof(float));
-    std::memcpy(mesh->normals,   normals.data(),   normals.size() * sizeof(float));
-    std::memcpy(mesh->indices,   indices.data(),   indices.size() * sizeof(uint32_t));
-    std::memcpy(mesh->groups,    groups.data(),    groups.size() * sizeof(CADMeshGroup));
 
     mesh->bboxMin[0] = static_cast<float>(xMin);
     mesh->bboxMin[1] = static_cast<float>(yMin);
@@ -250,13 +271,70 @@ CADMesh *finalizeMesh(std::vector<float> &positions,
     mesh->bboxMax[2] = static_cast<float>(zMax);
 
     char info[512];
-    std::snprintf(info, sizeof(info),
-                  "%.1f × %.1f × %.1f\n%d faces · %u triangles · %u colours",
-                  xMax - xMin, yMax - yMin, zMax - zMin,
-                  faceCount, mesh->triangleCount, mesh->groupCount);
+    if (summary.empty()) {
+        std::snprintf(info, sizeof(info),
+                      "%.1f × %.1f × %.1f\n%d faces · %u triangles · %u colours",
+                      xMax - xMin, yMax - yMin, zMax - zMin,
+                      faceCount, mesh->triangleCount, mesh->groupCount);
+    } else {
+        std::snprintf(info, sizeof(info), "%.1f × %.1f × %.1f\n%s",
+                      xMax - xMin, yMax - yMin, zMax - zMin, summary.c_str());
+    }
     mesh->info = dupString(info);
 
     return mesh;
+}
+
+CADMesh *loadFromDrawing(const DxfDrawing &drawing) {
+    std::vector<float> positions = drawing.faces.positions;
+    positions.resize(positions.size() - positions.size() % 3);
+    std::vector<float> normals(positions.size(), 0.0f);
+    std::map<ColorKey, std::vector<uint32_t>> buckets;
+
+    const std::vector<uint32_t> &indices = drawing.faces.indices;
+    const size_t vertexCount = positions.size() / 3;
+    std::vector<uint32_t> faces;
+    faces.reserve(indices.size());
+    for (size_t i = 0; i + 2 < indices.size(); i += 3) {
+        const uint32_t ia = indices[i], ib = indices[i + 1], ic = indices[i + 2];
+        if (ia >= vertexCount || ib >= vertexCount || ic >= vertexCount) continue;
+        faces.insert(faces.end(), {ia, ib, ic});
+        const gp_Vec v0(positions[ia * 3], positions[ia * 3 + 1], positions[ia * 3 + 2]);
+        const gp_Vec v1(positions[ib * 3], positions[ib * 3 + 1], positions[ib * 3 + 2]);
+        const gp_Vec v2(positions[ic * 3], positions[ic * 3 + 1], positions[ic * 3 + 2]);
+        const gp_Vec n = (v1 - v0).Crossed(v2 - v0);
+        for (uint32_t idx : {ia, ib, ic}) {
+            normals[idx * 3]     += static_cast<float>(n.X());
+            normals[idx * 3 + 1] += static_cast<float>(n.Y());
+            normals[idx * 3 + 2] += static_cast<float>(n.Z());
+        }
+    }
+    if (!faces.empty()) {
+        buckets[packColor(kDefaultColor[0], kDefaultColor[1],
+                          kDefaultColor[2], kDefaultColor[3])] = std::move(faces);
+    }
+
+    std::string summary = "DXF";
+    if (!drawing.version.empty()) summary += " · " + drawing.version;
+    if (!drawing.units.empty()) summary += " · " + drawing.units;
+    summary += " · " + std::to_string(drawing.entityCount) +
+               (drawing.entityCount == 1 ? " entity" : " entities");
+    if (!drawing.skippedTypes.empty()) {
+        constexpr size_t kListed = 4;
+        std::string names;
+        size_t listed = 0;
+        for (const std::string &type : drawing.skippedTypes) {
+            if (listed == kListed) break;
+            names += (listed++ ? ", " : "") + type;
+        }
+        if (drawing.skippedTypes.size() > kListed) {
+            names += " and " + std::to_string(drawing.skippedTypes.size() - kListed) + " more";
+        }
+        summary += "\nNot shown yet: " + names;
+    }
+    if (drawing.truncated) summary += "\nPartial preview: the drawing is beyond the preview limits";
+
+    return finalizeMesh(positions, normals, buckets, 0, drawing.segments, summary);
 }
 
 void appendTriangulation(const Handle(Poly_Triangulation) &tri,
@@ -396,6 +474,11 @@ CADMesh *loadModel(const char *path, double deflection,
         RawMesh raw;
         if (!read3mf(filePath, raw, error)) return makeError(error);
         return loadFromRawMesh(raw);
+    } else if (ext == "dxf") {
+        reportProgress(progress, context, "Reading DXF…");
+        DxfDrawing drawing;
+        if (!readDxf(filePath, drawing, error)) return makeError(error);
+        return loadFromDrawing(drawing);
     } else {
         return makeError("Unsupported file type: ." + ext);
     }
@@ -522,6 +605,7 @@ extern "C" void cadmesh_free(CADMesh *mesh) {
     std::free(mesh->normals);
     std::free(mesh->indices);
     std::free(mesh->groups);
+    std::free(mesh->lines);
     std::free(mesh->info);
     std::free(mesh->error);
     std::free(mesh);

@@ -8,8 +8,9 @@ already preview images and PDFs.
 macOS has no idea what a STEP file is. Select one in the Finder, press space,
 and you get a blank document icon. This adds a Quick Look extension that reads
 the file, tessellates the real B-rep geometry, and shows an interactive 3D model
-you can orbit, zoom and inspect without opening Fusion. Spacebar also
-lists zip, RAR and 7z archives, and shows G-code and Markdown as text.
+you can orbit, zoom and inspect without opening Fusion. DXF and DWG drawings
+open flat, as linework you can pan and zoom. Spacebar also lists zip, RAR and
+7z archives, and shows G-code and Markdown as text.
 
 ## Demo
 
@@ -64,6 +65,10 @@ so it skips steps 3 and 4 entirely.
 | Orbit | Drag |
 | Zoom | Scroll (toward the pointer by default; both that and the direction are in Settings) |
 | Pan | Two finger drag, or right button drag |
+
+Flat DXF and DWG drawings stay flat, like a sheet of paper on a desk: they
+never rotate. Two finger scroll or any drag pans, and pinch or a mouse wheel
+zooms toward the pointer.
 
 The first view frames the tessellated part with a little space to the edge of
 the panel, not the untrimmed NURBS hull — so a Rhino STEP file is not a speck
@@ -125,6 +130,8 @@ because the result is cached.
 | IGES | `.iges`, `.igs` | yes |
 | STL | `.stl` | no (the format has none) |
 | 3MF | `.3mf` | no (basic mesh support) |
+| DXF | `.dxf` | not yet (ASCII DXF; text and hatches are not drawn yet) |
+| DWG | `.dwg` | not yet (converted to DXF by LibreDWG, same limits) |
 | G-code | `.nc`, `.tap` | syntax highlighting (text, not a mesh) |
 | Markdown | `.md`, `.markdown` | rendered CommonMark, or the original source |
 | Archive | `.zip`, `.rar`, `.7z` | file listing (names and sizes, nothing extracted) |
@@ -218,6 +225,9 @@ If it reports `gzip compressed data`, that is the known limitation below.
 * No Finder icon thumbnails yet. Files still show a generic icon in icon view;
   the preview only appears on spacebar.
 * No OBJ or PLY support yet.
+* DXF and DWG previews draw geometry only. Text, dimension text, hatches
+  and layer colours are not drawn yet, and the preview lists what it left out.
+  Binary DXF is not supported.
 * G-code is a highlighted text preview, not a 3D toolpath.
 * Archive preview is a listing only. Encrypted headers (some RAR files)
   cannot be listed without a password.
@@ -237,7 +247,7 @@ it works.
 
 An app you compiled is never quarantined, so building skips the Gatekeeper
 approval the download needs. One command does the lot — it checks your Mac is
-supported, installs [Homebrew](https://brew.sh) and OpenCASCADE if they are
+supported, installs [Homebrew](https://brew.sh), OpenCASCADE and LibreDWG if they are
 missing, builds the newest release, and installs it:
 
 ```bash
@@ -254,7 +264,7 @@ By hand, if you prefer:
 
 ```bash
 xcode-select --install          # Command Line Tools; Xcode is not required
-brew install opencascade
+brew install opencascade libredwg
 git clone https://github.com/jbrewlet/mac-cad-preview.git
 cd mac-cad-preview
 git checkout "$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
@@ -316,6 +326,15 @@ can draw them. That work is done by [OpenCASCADE](https://dev.opencascade.org).
 STEP stores colours as `styled_item` entities, and they can be attached to a
 whole solid or to an individual face. Triangles are grouped by colour and drawn
 one draw call per group.
+
+DXF is read by a small parser of its own (`src/core/read_dxf.cpp`), not by
+OpenCASCADE. Lines, arcs, circles, ellipses, polylines and splines become
+hairlines; blocks are expanded with their transforms; 3D faces and polyface
+meshes become triangles. Every count is capped, so a hostile file can only
+produce a partial preview, never an unbounded one.
+
+DWG is a closed format. LibreDWG's `dwg2dxf` converts it to DXF, which then
+goes through the same parser.
 
 ## Performance
 
@@ -384,6 +403,12 @@ attributed text for the rendered view; **Source** shows the file as written.
 The default view is a setting, and the control on the panel writes the same
 preference.
 
+Quick Look extensions may not start other programs, so DWG conversion runs in
+a second XPC service inside the extension, `MacCADPreviewDWG.xpc`. It is
+sandboxed with no file access of its own: the extension hands it the DWG and
+an empty output file as open file handles, and it runs `dwg2dxf` inside its
+own sandbox with a 20 second limit.
+
 Zip, RAR and 7z files also use the text panel. The extension reads the
 archive headers through the system libarchive and lists names and sizes;
 it does not unpack members. Archives with more than 10,000 entries show
@@ -404,6 +429,20 @@ None of them are modified.
 | FreeType | FreeType Licence (BSD style) |
 | libpng | PNG Reference Library Licence |
 | Intel oneTBB | Apache 2.0 |
+
+The app also bundles one separate program, unmodified:
+
+| Program | Licence |
+|:--------|:--------|
+| `dwg2dxf` from [GNU LibreDWG](https://www.gnu.org/software/libredwg/) | GPL 3.0 or later |
+
+It is not linked into the app. A small sandboxed service inside the Quick
+Look extension runs it as its own process to convert a DWG to DXF, and hands
+the result back to the extension. Its licence text ships beside it, as
+`Contents/PlugIns/MacCADPreviewQL.appex/Contents/XPCServices/MacCADPreviewDWG.xpc/Contents/Resources/LibreDWG-COPYING.txt`,
+and its complete source is at
+[ftp.gnu.org/gnu/libredwg](https://ftp.gnu.org/gnu/libredwg/) under the
+version the app was built with (`brew list --versions libredwg`).
 
 The repository itself contains no third party code. Those libraries arrive via
 Homebrew when you build, and are copied into the app bundle at that point. If

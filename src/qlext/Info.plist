@@ -32,6 +32,8 @@
 				<string>com.maccadpreview.iges</string>
 				<string>com.maccadpreview.3mf</string>
 				<string>com.maccadpreview.gcode</string>
+				<string>com.maccadpreview.dxf</string>
+				<string>com.maccadpreview.dwg</string>
 				<string>net.daringfireball.markdown</string>
 				<string>public.zip-archive</string>
 				<string>com.pkware.zip-archive</string>

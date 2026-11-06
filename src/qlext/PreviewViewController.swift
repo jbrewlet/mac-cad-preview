@@ -322,9 +322,15 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             } else {
                 cached = false
                 DispatchQueue.main.async { self?.showParseProgress(for: url) }
-                switch Self.parseMesh(at: url, onProgress: { [weak self] stage in
+                let onProgress: (String) -> Void = { [weak self] stage in
                     DispatchQueue.main.async { self?.showLoadStage(stage) }
-                }) {
+                }
+                let result = DWGConverter.isDWG(url)
+                    ? DWGConverter.withConvertedDXF(from: url, onProgress: onProgress) {
+                        Self.parseMesh(at: $0, onProgress: onProgress)
+                    }
+                    : Self.parseMesh(at: url, onProgress: onProgress)
+                switch result {
                 case .failure(let error):
                     DispatchQueue.main.async { self?.showFailure(error.message) }
                     return
@@ -336,10 +342,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
             let (geometry, colors) = Self.makeGeometry(from: meshData)
             let edges = MeshEdges.geometry(from: meshData)
+            let lines = DrawingLines.geometry(from: meshData)
+            let planar = meshData.isPlanarDrawing
             let elapsed = CFAbsoluteTimeGetCurrent() - started
 
             DispatchQueue.main.async {
-                self?.present(geometry: geometry, edges: edges, colors: colors,
+                self?.present(geometry: geometry, edges: edges, lines: lines, planar: planar,
+                              colors: colors,
                               info: meshData.info,
                               bounds: (min: meshData.bboxMin, max: meshData.bboxMax),
                               elapsed: elapsed, cached: cached)
@@ -461,6 +470,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
     private func present(geometry: SCNGeometry,
                          edges: SCNGeometry?,
+                         lines: SCNGeometry?,
+                         planar: Bool,
                          colors: [NSColor],
                          info: String,
                          bounds: (min: SIMD3<Float>, max: SIMD3<Float>),
@@ -501,11 +512,25 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
         // CAD tools treat +Z as up; SceneKit treats +Y as up. The default
         // maps model Z onto scene Y. Y-up skips that, for SceneKit-style files.
+        // A flat drawing is always Z-up, and is shown from above, in ortho.
+        let zUp = planar || PreviewPreferences.upAxis == .zUp
+        let ortho = planar || PreviewPreferences.orthographic
         let oriented = SCNNode()
-        if PreviewPreferences.upAxis == .zUp {
+        if zUp {
             oriented.eulerAngles.x = -.pi / 2
         }
         oriented.addChildNode(node)
+
+        if let lines {
+            lines.firstMaterial?.diffuse.contents = Self.drawingLineColor(for: sceneView)
+            let linework = SCNNode(geometry: lines)
+            linework.pivot = pivot
+            linework.renderingOrder = 2
+            // In a flat drawing, fills (SOLID, hatches) share the plane with
+            // the outlines; draw the outlines over them rather than z-fight.
+            lines.firstMaterial?.readsFromDepthBuffer = !planar
+            oriented.addChildNode(linework)
+        }
 
         if let edges {
             let overlay = SCNNode(geometry: edges)
@@ -519,6 +544,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         } else {
             edgeNode = nil
         }
+        // Pure linework has no surfaces, so there are no edges to toggle.
+        edgesToggle.isHidden = (edges == nil)
         edgesToggle.state = PreviewPreferences.showEdges ? .on : .off
         scene.rootNode.addChildNode(oriented)
 
@@ -533,7 +560,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
 
         let aspect = Self.viewAspect(of: sceneView)
         let fit = Self.fitCamera(boundsMin: bounds.min, boundsMax: bounds.max,
-                                 zUp: PreviewPreferences.upAxis == .zUp,
+                                 zUp: zUp,
+                                 direction: Self.cameraDirection(for: planar ? .top : PreviewPreferences.initialView),
                                  aspect: aspect,
                                  fieldOfView: camera.fieldOfView)
         let cameraNode = SCNNode()
@@ -570,9 +598,13 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         sceneView.orbitTarget = SCNVector3Zero
         sceneView.modelRadius = CGFloat(radius)
         sceneView.defaultCameraController.target = SCNVector3Zero
+        sceneView.isFlatDrawing = planar
 
-        orthoToggle.state = PreviewPreferences.orthographic ? .on : .off
-        applyProjection(PreviewPreferences.orthographic)
+        // A flat drawing is always orthographic; perspective would only make
+        // the sheet look tilted.
+        orthoToggle.isHidden = planar
+        orthoToggle.state = ortho ? .on : .off
+        applyProjection(ortho)
 
         let size = extent
         copyableDimensions = String(format: "%.1f × %.1f × %.1f",
@@ -656,9 +688,19 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
         return (geometry, colors)
     }
 
+    /// Linework takes the label colour of the panel's appearance, so a drawing
+    /// stays legible on both the light and dark Quick Look backgrounds.
+    private static func drawingLineColor(for view: NSView) -> NSColor {
+        var color = NSColor.black
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            color = NSColor.labelColor.usingColorSpace(.sRGB) ?? .black
+        }
+        return color
+    }
+
     /// Same view directions as before; distance is computed by `fitCamera`.
-    private static func cameraDirection() -> SIMD3<Float> {
-        switch PreviewPreferences.initialView {
+    private static func cameraDirection(for view: InitialView) -> SIMD3<Float> {
+        switch view {
         case .isometric:
             return simd_normalize(SIMD3<Float>(1, 0.9, 1))
         case .front:
@@ -682,6 +724,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
     private static func fitCamera(boundsMin: SIMD3<Float>,
                                   boundsMax: SIMD3<Float>,
                                   zUp: Bool,
+                                  direction toCamera: SIMD3<Float>,
                                   aspect: Double,
                                   fieldOfView: Double,
                                   padding: Double = 1.10) -> (position: SCNVector3, orthographicScale: Double) {
@@ -700,7 +743,6 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             }
         }
 
-        let toCamera = cameraDirection()
         let forward = -toCamera
         var worldUp = SIMD3<Float>(0, 1, 0)
         if abs(simd_dot(forward, worldUp)) > 0.98 {
@@ -1101,23 +1143,47 @@ enum MeshEdges {
         }
         guard lineIndices.count >= 2 else { return nil }
 
-        let positionData = linePositions.withUnsafeBufferPointer { Data(buffer: $0) }
-        let indexData = lineIndices.withUnsafeBufferPointer { Data(buffer: $0) }
+        return LineGeometry.make(
+            positions: linePositions, indices: lineIndices,
+            color: NSColor(srgbRed: 0.12, green: 0.13, blue: 0.15, alpha: 0.85))
+    }
+}
+
+/// The DXF linework (lines, arcs, polylines, splines) as hairlines. Colour is
+/// set at presentation, once the panel's appearance is known.
+enum DrawingLines {
+
+    static func geometry(from mesh: MeshData) -> SCNGeometry? {
+        let segments = mesh.lines.count / 6
+        guard segments > 0, mesh.lines.count % 6 == 0,
+              mesh.lines.allSatisfy(\.isFinite) else { return nil }
+        return LineGeometry.make(positions: mesh.lines,
+                                 indices: Array(0..<UInt32(segments * 2)),
+                                 color: .labelColor)
+    }
+}
+
+/// Unlit line-segment geometry: each pair of indices is one segment.
+enum LineGeometry {
+
+    static func make(positions: [Float], indices: [UInt32], color: NSColor) -> SCNGeometry {
+        let positionData = positions.withUnsafeBufferPointer { Data(buffer: $0) }
+        let indexData = indices.withUnsafeBufferPointer { Data(buffer: $0) }
         let source = SCNGeometrySource(
             data: positionData, semantic: .vertex,
-            vectorCount: linePositions.count / 3,
+            vectorCount: positions.count / 3,
             usesFloatComponents: true, componentsPerVector: 3,
             bytesPerComponent: MemoryLayout<Float>.size, dataOffset: 0,
             dataStride: MemoryLayout<Float>.size * 3)
         let element = SCNGeometryElement(
             data: indexData, primitiveType: .line,
-            primitiveCount: lineIndices.count / 2,
+            primitiveCount: indices.count / 2,
             bytesPerIndex: MemoryLayout<UInt32>.size)
 
         let geometry = SCNGeometry(sources: [source], elements: [element])
         let material = SCNMaterial()
         material.lightingModel = .constant
-        material.diffuse.contents = NSColor(srgbRed: 0.12, green: 0.13, blue: 0.15, alpha: 0.85)
+        material.diffuse.contents = color
         material.isDoubleSided = true
         geometry.materials = [material]
         return geometry
@@ -1148,15 +1214,29 @@ final class ClickableLabel: NSTextField {
 /// SceneKit's built-in camera control always zooms toward the centre of the
 /// view, in a fixed direction. Taking over the scroll wheel lets the zoom go
 /// toward whatever is under the pointer — the behaviour every CAD app has —
-/// while orbit and pan stay with the built-in controller.
+/// while orbit and pan stay with the built-in controller. Flat drawings take
+/// over pan and pinch as well, so they can never be orbited.
 final class CADSceneView: SCNView {
 
     var orbitTarget = SCNVector3Zero
     var modelRadius: CGFloat = 1
 
+    /// A flat drawing is only ever seen from above, like a sheet of paper:
+    /// two fingers or a drag pan it, a pinch or a mouse wheel zooms, and
+    /// nothing rotates it.
+    var isFlatDrawing = false {
+        didSet { allowsCameraControl = !isFlatDrawing }
+    }
+
     override func scrollWheel(with event: NSEvent) {
         guard let pov = pointOfView else {
             super.scrollWheel(with: event)
+            return
+        }
+
+        // Trackpad scrolling pans a drawing; a mouse wheel still zooms it.
+        if isFlatDrawing, event.hasPreciseScrollingDeltas {
+            panDrawing(by: CGPoint(x: event.scrollingDeltaX, y: event.scrollingDeltaY))
             return
         }
 
@@ -1183,6 +1263,14 @@ final class CADSceneView: SCNView {
             target = hits.first?.worldCoordinates ?? orbitTarget
         } else {
             target = orbitTarget
+        }
+
+        if isFlatDrawing {
+            let anchor = PreviewPreferences.zoomTarget == .pointer
+                ? convert(event.locationInWindow, from: nil)
+                : CGPoint(x: bounds.midX, y: bounds.midY)
+            zoomDrawing(by: delta > 0 ? (1 - step) : (1 + step), keeping: anchor)
+            return
         }
 
         // Ortho zoom is a scale change; moving the camera does nothing visible.
@@ -1224,5 +1312,101 @@ final class CADSceneView: SCNView {
         // turns around the detail being inspected rather than the whole part.
         orbitTarget = target
         defaultCameraController.target = target
+    }
+
+    // MARK: - Flat drawings
+
+    override func magnify(with event: NSEvent) {
+        guard isFlatDrawing else {
+            super.magnify(with: event)
+            return
+        }
+        let factor = 1 / max(1 + event.magnification, 0.1)
+        zoomDrawing(by: factor, keeping: convert(event.locationInWindow, from: nil))
+    }
+
+    override func rotate(with event: NSEvent) {
+        if !isFlatDrawing { super.rotate(with: event) }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isFlatDrawing else {
+            super.mouseDragged(with: event)
+            return
+        }
+        panDrawing(by: CGPoint(x: event.deltaX, y: event.deltaY))
+    }
+
+    override func rightMouseDragged(with event: NSEvent) {
+        guard isFlatDrawing else {
+            super.rightMouseDragged(with: event)
+            return
+        }
+        panDrawing(by: CGPoint(x: event.deltaX, y: event.deltaY))
+    }
+
+    override func otherMouseDragged(with event: NSEvent) {
+        guard isFlatDrawing else {
+            super.otherMouseDragged(with: event)
+            return
+        }
+        panDrawing(by: CGPoint(x: event.deltaX, y: event.deltaY))
+    }
+
+    /// View points per world unit, along the drawing's plane.
+    private func pointsPerUnit(of pov: SCNNode) -> CGFloat {
+        let origin = projectPoint(orbitTarget)
+        let right = pov.worldRight
+        let step = projectPoint(SCNVector3(orbitTarget.x + right.x,
+                                           orbitTarget.y + right.y,
+                                           orbitTarget.z + right.z))
+        return hypot(step.x - origin.x, step.y - origin.y)
+    }
+
+    /// Moves the drawing with the fingers or pointer. `delta` uses NSEvent's
+    /// convention: positive y moves the content down the screen.
+    private func panDrawing(by delta: CGPoint) {
+        guard let pov = pointOfView else { return }
+        let scale = pointsPerUnit(of: pov)
+        guard scale > 0, delta != .zero else { return }
+        shiftCamera(pov, right: -delta.x / scale, up: delta.y / scale)
+    }
+
+    /// Scales the view by `factor` (below 1 zooms in) while the drawing under
+    /// `anchor` stays put.
+    private func zoomDrawing(by factor: CGFloat, keeping anchor: CGPoint) {
+        guard let pov = pointOfView, let camera = pov.camera else { return }
+        let scale = pointsPerUnit(of: pov)
+        guard scale > 0 else { return }
+
+        let minScale = Double(max(modelRadius * 0.01, 1e-4))
+        let maxScale = Double(modelRadius) * 20
+        let old = camera.orthographicScale
+        let new = min(maxScale, max(minScale, old * Double(factor)))
+        guard new != old else { return }
+        camera.orthographicScale = new
+
+        // The anchor's offset from the centre, in world units, shrinks or
+        // grows with the zoom; move the camera by the difference.
+        let kept = 1 - CGFloat(new / old)
+        shiftCamera(pov,
+                    right: (anchor.x - bounds.midX) / scale * kept,
+                    up: (anchor.y - bounds.midY) / scale * kept)
+    }
+
+    private func shiftCamera(_ pov: SCNNode, right: CGFloat, up: CGFloat) {
+        let r = pov.worldRight
+        let u = pov.worldUp
+        let move = SCNVector3(r.x * right + u.x * up,
+                              r.y * right + u.y * up,
+                              r.z * right + u.z * up)
+        let position = pov.worldPosition
+        pov.worldPosition = SCNVector3(position.x + move.x,
+                                       position.y + move.y,
+                                       position.z + move.z)
+        orbitTarget = SCNVector3(orbitTarget.x + move.x,
+                                 orbitTarget.y + move.y,
+                                 orbitTarget.z + move.z)
+        defaultCameraController.target = orbitTarget
     }
 }

@@ -1,6 +1,6 @@
 // C API over OpenCASCADE, so Swift can call it without dealing with C++.
 // Loads a CAD file, tessellates it, and hands back flat buffers ready to
-// become a SceneKit geometry.
+// become a SceneKit geometry. A model may be triangles, lines, or both.
 #ifndef CADMESH_H
 #define CADMESH_H
 
@@ -28,6 +28,11 @@ typedef struct CADMesh {
 
     CADMeshGroup *groups;   // NULL if the file carried no colour information
     uint32_t      groupCount;
+
+    // Drawing linework (DXF), drawn as hairlines: 6 floats, two points, per
+    // segment. NULL when the model has none.
+    float    *lines;
+    uint32_t  lineSegmentCount;
 
     float bboxMin[3];
     float bboxMax[3];
